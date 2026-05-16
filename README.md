@@ -63,12 +63,11 @@ afo move ~/Downloads --dry-run # 미리 보기
 ### Typer 라이브러리
 
 1. Typer 선택 이유
-
-- VS Argparse, Click, Fire, Docopt
-  - Argparse: 코드량이 2~3배 많아짐, 깔끔한 출력 결과 어려움
-  - Click: Typer보다 코드량 조금 많아짐
-  - Fire: 제어가 약함
-  - Docopt: 직관적이나 유지보수 조금 어려움
+    - VS Argparse, Click, Fire, Docopt
+      - Argparse: 코드량이 2~3배 많아짐, 깔끔한 출력 결과 어려움
+      - Click: Typer보다 코드량 조금 많아짐
+      - Fire: 제어가 약함
+      - Docopt: 직관적이나 유지보수 조금 어려움
 
 2. Typer.Argument, Typer.Option 비교
    - Argument(위치 인자)
