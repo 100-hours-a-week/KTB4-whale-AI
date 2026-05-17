@@ -57,7 +57,7 @@ afo move ~/Downloads --dry-run # 미리 보기
 
 - Python 3.11+
 - Typer (CLI)
-- Rich (예쁜 출력)
+- Rich (출력 스타일)
 - pathlib (파일 처리)
 
 ### Typer 라이브러리
