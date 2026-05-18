@@ -7,8 +7,9 @@
 ## 기능
 
 - `afo stats`: 확장자별 파일 개수, 비율, 이동될 폴더 분석
-- `afo rename`: `{num:02d}_{title}_{date}` 패턴으로 파일명 정리 (숨김 파일 자동 스킵)
+- `afo rename`: `{num:02d}_{title}_{date}` 패턴으로 파일명 정리 (**VirusTotal async** 스캔 포함, 숨김 파일 자동 스킵)
 - `afo move`: 확장자에 따라 Images, Documents, Archives, Videos, Audio, Others 폴더로 자동 이동 (폴더 자동 생성)
+- `afo organize`: 파일명 변경 + 폴더 이동을 한 번에 (**VirusTotal async** 스캔 포함)
 
 ## 설치 방법
 
@@ -20,7 +21,9 @@ cd auto-file-organizer
 
 ```python
 # 2. 설치
-pip install -e .
+python3 -m venv .venv # 가상환경 생성
+source .venv/bin/activate # 가상환경 활성화
+pip install -e . # 라이브러리 설치
 ```
 
 ### 사용 예시
@@ -32,9 +35,10 @@ afo stats ~/Downloads # Downloads 폴더 분석
 ```
 
 ```python
-# 2. 이름 정리
+# 2. 파일명 변경
 afo rename ~/Downloads
-afo renmae ~/Downloads --dry-run # 미리 보기
+afo rename ~/Downloads --dry-run # 미리 보기
+afo rename ~/Downloads --scan # 바이러스 검사
 ```
 
 ```python
@@ -43,11 +47,19 @@ afo move ~/Downloads
 afo move ~/Downloads --dry-run # 미리 보기
 ```
 
+```python
+# 4. 파일 정리 (파일명 변경 + 파일 이동)
+afo organize ~/Downloads
+afo organize ~/Downloads --dry-run # 미리 보기
+afo organize ~/Downloads --scan # 바이러스 검사
+```
+
 ### 주요 옵션
 
 - `--dry-run` / `-n`: 실제 변경 없이 미리보기
 - `--backup`: 원본을 ``폴더에 복사
 - `--yes` / `-y`: 확인 창 없이 바로 실행
+- `--scan`: Virus 검사(스캔) (.env 파일에 Virus Total API Key 선 추가 필요)
 
 ### 지원 확장자
 
@@ -63,11 +75,11 @@ afo move ~/Downloads --dry-run # 미리 보기
 ### Typer 라이브러리
 
 1. Typer 선택 이유
-    - VS Argparse, Click, Fire, Docopt
-      - Argparse: 코드량이 2~3배 많아짐, 깔끔한 출력 결과 어려움
-      - Click: Typer보다 코드량 조금 많아짐
-      - Fire: 제어가 약함
-      - Docopt: 직관적이나 유지보수 조금 어려움
+   - VS Argparse, Click, Fire, Docopt
+     - Argparse: 코드량이 2~3배 많아짐, 깔끔한 출력 결과 어려움
+     - Click: Typer보다 코드량 조금 많아짐
+     - Fire: 제어가 약함
+     - Docopt: 직관적이나 유지보수 조금 어려움
 
 2. Typer.Argument, Typer.Option 비교
    - Argument(위치 인자)
