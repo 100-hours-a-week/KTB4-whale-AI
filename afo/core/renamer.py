@@ -6,6 +6,7 @@ from datetime import datetime
 from rich.console import Console
 from rich.table import Table
 from .utils import safe_filename, should_proceed, create_backup
+from .scanner import scan_files
 
 console = Console()
 
@@ -28,12 +29,13 @@ def format_filename(file: Path, pattern: str, index: int) -> str:
 
     return new_name + file.suffix.lower() # 확장자는 소문자로
 
-def rename_files(
+async def rename_files(
         folder_path: str,
         pattern: str = "{num:02d}_{title}_{date}",
         dry_run: bool = False,
         backup: bool = False,
         yes: bool = False,
+        scan: bool = True,
 ) -> None:
     """파일명 변경 실행"""
     target = Path(folder_path).expanduser().resolve()
@@ -58,6 +60,16 @@ def rename_files(
         console.print("[yellow]작업이 취소되었습니다.[/yellow]")
         return
     
+    # VirusTotal async 스캔
+    if scan:
+        scan_results = await scan_files(files)
+        # 악성 파일 처리 (예: malicious > 0이면 Others 폴더로 이동 경고)
+        for file in files:
+            result = scan_results.get(str(file), {})
+            if result.get("malicious", 0) > 0 or result.get("yara_detected", False):
+                console.print(f"[red]⚠️  {file.name} → VirusTotal에서 악성 의심 감지! (Others 폴더로 이동 권장)[/red]")
+
+    # rename
     table = Table(title=f"🔄 파일명 변경 결과 ({len(files)}개 파일)")
     table.add_column("원래 이름", style="red")
     table.add_column("새 이름", style="green")
