@@ -1,4 +1,4 @@
-# 1주차 프로젝트
+# 1 Week Weekly Challange
 
 ## Auto File Organizer ('afo')
 
@@ -6,7 +6,7 @@
 
 ## 회고록
 
-- [회고록 바로가기](./RETROSPECTIVE.md)
+- [1주차 회고록 바로가기](./RETROSPECTIVE.md)
 
 ## 기능
 
@@ -20,7 +20,7 @@
 ```bash
 # 1. Repository 클론 및 이동
 git clone https://github.com/100-hours-a-week/KTB4-whale-AI.git
-cd auto-file-organizer
+cd 01_Weekly_Challange
 ```
 
 ```python
