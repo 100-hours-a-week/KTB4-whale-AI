@@ -56,7 +56,7 @@ class PostRead(PostBase):
 
 # Summary
 class SummaryRead(BaseModel):
-	summary: str
+	summary: str = "요약 생성 불가"
 
 # ====================== In-memory 저장소 ======================
 posts: List[PostRead] = []
@@ -329,9 +329,9 @@ def create_posts_summary():
 			model='gemma4:e4b',
 			messages=[{'role': 'user', 'content': prompt}]
 		)
-		summarized_posts = (response.message.content or "")
+		summarized_posts = response.message.content
 		print(summarized_posts)
-		return SummaryRead(summary=summarized_posts)
+		return SummaryRead(summary=summarized_posts) if summarized_posts is not None else SummaryRead()
 	except Exception as e:
 		raise HTTPException(
 			status_code=500,
@@ -489,9 +489,10 @@ def create_comments_summary(post_id: int):
 					messages=[{'role': 'user', 'content': prompt}]
 				)
 
-				summarized_comments = (response.message.content or "")
+				summarized_comments = response.message.content
 				print(summarized_comments)
-				return SummaryRead(summary=summarized_comments)
+				
+				return SummaryRead(summary=summarized_comments) if summarized_comments is not None else SummaryRead()
 			except Exception as e:
 				raise HTTPException(
 					status_code=500,
