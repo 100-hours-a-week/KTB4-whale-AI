@@ -1,9 +1,18 @@
 # 2 Week Weekly Challange
 
-## Community Web Page Server Developing
+## 개요
 
-- [커뮤니티 사이트](https://edu-community.adapterz.kr) 백엔드 서버 구현
-- FastAPI로 구현
+1. 프로젝트 구현 (Community Web Page Server)
+   - [커뮤니티 사이트](https://edu-community.adapterz.kr) 백엔드 서버 구현
+   - FastAPI로 구현
+2. HTTP 정리
+   - 개념 한 줄 정리
+   - 개념 간 논리적 연결 고리 생성
+
+## 챌린지 결과
+
+1. [프로젝트 구현 바로가기](./main.py)
+2. [HTTP 정리 바로가기](./ORGANIZING_HTTP.md)
 
 ## 회고록
 

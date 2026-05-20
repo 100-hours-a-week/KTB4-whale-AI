@@ -2,6 +2,7 @@ from fastapi import FastAPI, status, HTTPException
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
 from typing import List, Optional
+from ollama import chat
 
 app = FastAPI()
 
@@ -32,7 +33,6 @@ class CommentRead(CommentBase):
 	email: EmailStr # 사용자 이메일
 	created_at: datetime
 
-
 # Post
 class PostBase(BaseModel):
 	title: str # 제목
@@ -54,12 +54,17 @@ class PostRead(PostBase):
 	updated_at: datetime # 수정일
 	comments: List[CommentRead] # 댓글
 
+# Summary
+class SummaryRead(BaseModel):
+	summary: str
+
 # ====================== In-memory 저장소 ======================
 posts: List[PostRead] = []
 post_id_counter = 0
 comment_id_counter = 0
+summarys: List[SummaryRead] = []
 
-# ====================== Post 엔드포인트 - 전체 CRUD ======================
+# ====================== Post 엔드포인트 (전체 CRUD) ======================
 # GET - posts 호출
 @app.get('/posts', response_model=List[PostRead])
 def get_posts():
@@ -115,7 +120,7 @@ def delete_post(post_id: int):
 	return None
 
 
-# ====================== Comment 엔드포인트 - 전체 CRUD ======================
+# ====================== Comment 엔드포인트 (Create, Update, Delete) ======================
 # POST - comment 추가
 @app.post('/posts/{post_id}/comments', response_model=CommentRead)
 def create_comment(post_id: int, new_comment: CommentCreate):
@@ -175,3 +180,322 @@ def increment_like(post_id: int):
 			post.likes += 1
 			return {"post_id": post_id, "likes": post.likes}
 	raise HTTPException(status_code=404, detail="게시글을 찾을 수 없습니다.")
+
+# ====================== AI 요약 엔드포인트 (Create) ======================
+# POST - 게시글 요약
+@app.post('/posts/summary', response_model=SummaryRead)
+def create_posts_summary():
+	"""1. 전체 게시글 목록 요약"""
+	# if not posts:
+	# 	return SummaryRead(summary="아직 게시글이 없습니다.")
+	
+	# TODO: 더미데이터 지우기
+	dummy_posts: List[PostRead] = [
+		PostRead(
+			id=1,
+			email="test1@example.com",
+			title="FastAPI로 REST API 만들기",
+			content="FastAPI와 Pydantic을 활용한 백엔드 개발 방법을 공유합니다.",
+			likes=0,
+			views=0,
+			created_at=datetime.now(),
+			updated_at=datetime.now(),
+			comments= [
+				CommentRead(
+					id=1,
+					email="user1@example.com",
+					content="FastAPI 정말 편리하네요! 자동 문서화가 최고예요.",
+					created_at=datetime(2026, 5, 20, 13, 0, 0)
+				),
+				CommentRead(
+					id=2,
+					email="user2@example.com",
+					content="Ollama 연동도 잘 되네요. AI 요약 기능 기대돼요!",
+					created_at=datetime(2026, 5, 20, 13, 5, 0)
+				),
+				CommentRead(
+					id=3,
+					email="user3@example.com",
+					content="gemma4:e4b 모델로 요약 속도가 빠른 편인가요?",
+					created_at=datetime(2026, 5, 20, 13, 10, 0)
+				)
+			]
+		),
+		PostRead(
+			id=2,
+			email="test2@example.com",
+			title="Ollama gemma4:e4b 사용 후기",
+			content="로컬 LLM을 FastAPI에 연동해서 게시글 요약 기능을 구현해보았습니다.",
+			likes=0,
+			views=0,
+			created_at=datetime.now(),
+			updated_at=datetime.now(),
+			comments= [
+				CommentRead(
+					id=1,
+					email="user1@example.com",
+					content="FastAPI 정말 편리하네요! 자동 문서화가 최고예요.",
+					created_at=datetime(2026, 5, 20, 13, 0, 0)
+				),
+				CommentRead(
+					id=2,
+					email="user2@example.com",
+					content="Ollama 연동도 잘 되네요. AI 요약 기능 기대돼요!",
+					created_at=datetime(2026, 5, 20, 13, 5, 0)
+				),
+				CommentRead(
+					id=3,
+					email="user3@example.com",
+					content="gemma4:e4b 모델로 요약 속도가 빠른 편인가요?",
+					created_at=datetime(2026, 5, 20, 13, 10, 0)
+				)
+			]
+		),
+		PostRead(
+			id=3,
+			email="test3@example.com",
+			title="Python snake_case vs camelCase",
+			content="FastAPI 프로젝트에서 필드명 컨벤션에 대해 이야기해봅니다.",
+			likes=0,
+			views=0,
+			created_at=datetime.now(),
+			updated_at=datetime.now(),
+			comments= [
+				CommentRead(
+					id=1,
+					email="user1@example.com",
+					content="FastAPI 정말 편리하네요! 자동 문서화가 최고예요.",
+					created_at=datetime(2026, 5, 20, 13, 0, 0)
+				),
+				CommentRead(
+					id=2,
+					email="user2@example.com",
+					content="Ollama 연동도 잘 되네요. AI 요약 기능 기대돼요!",
+					created_at=datetime(2026, 5, 20, 13, 5, 0)
+				),
+				CommentRead(
+					id=3,
+					email="user3@example.com",
+					content="gemma4:e4b 모델로 요약 속도가 빠른 편인가요?",
+					created_at=datetime(2026, 5, 20, 13, 10, 0)
+				)
+			]
+		),
+		PostRead(
+			id=4,
+			email="test4@example.com",
+			title="커뮤니티 사이트 기획 및 개발 과정",
+			content="기획 → 개발 → 배포까지의 전체 과정을 정리했습니다.",
+			likes=0,
+			views=0,
+			created_at=datetime.now(),
+			updated_at=datetime.now(),
+			comments= [
+				CommentRead(
+					id=1,
+					email="user1@example.com",
+					content="FastAPI 정말 편리하네요! 자동 문서화가 최고예요.",
+					created_at=datetime(2026, 5, 20, 13, 0, 0)
+				),
+				CommentRead(
+					id=2,
+					email="user2@example.com",
+					content="Ollama 연동도 잘 되네요. AI 요약 기능 기대돼요!",
+					created_at=datetime(2026, 5, 20, 13, 5, 0)
+				),
+				CommentRead(
+					id=3,
+					email="user3@example.com",
+					content="gemma4:e4b 모델로 요약 속도가 빠른 편인가요?",
+					created_at=datetime(2026, 5, 20, 13, 10, 0)
+				)
+			]
+		),
+	]
+	
+	post_text = '\n\n'.join(
+        [f"title:{post.title}\ncontent:{post.content}" for post in dummy_posts]
+    )
+
+	prompt = f"""
+				아래 게시글을 종합해서 한국어로 자연스럽게 요약해주세요.
+				전체적인 주제, 주요 의견, 분위기를 200자 이내로 간결하게 작성하라.
+
+				{post_text}
+			  """
+	
+	try:
+		response = chat(
+			model='gemma4:e4b',
+			messages=[{'role': 'user', 'content': prompt}]
+		)
+		summarized_posts = (response.message.content or "")
+		print(summarized_posts)
+		return SummaryRead(summary=summarized_posts)
+	except Exception as e:
+		raise HTTPException(
+			status_code=500,
+			detail=f"Ollama 호출 실패: {str(e)} (Ollama 서버가 실행 중인지 확인하세요)"
+		)
+
+# POST - 댓글 요약
+@app.post('/posts/{post_id}/comments/summary', response_model=SummaryRead)
+def create_comments_summary(post_id: int):
+	"""현재 게시글의 댓글 목록 요약"""
+	# TODO: 더미데이터 지우기
+	dummy_posts: List[PostRead] = [
+		PostRead(
+			id=1,
+			email="test1@example.com",
+			title="FastAPI로 REST API 만들기",
+			content="FastAPI와 Pydantic을 활용한 백엔드 개발 방법을 공유합니다.",
+			likes=0,
+			views=0,
+			created_at=datetime.now(),
+			updated_at=datetime.now(),
+			comments= [
+				CommentRead(
+					id=1,
+					email="user1@example.com",
+					content="FastAPI 정말 편리하네요! 자동 문서화가 최고예요.",
+					created_at=datetime(2026, 5, 20, 13, 0, 0)
+				),
+				CommentRead(
+					id=2,
+					email="user2@example.com",
+					content="Ollama 연동도 잘 되네요. AI 요약 기능 기대돼요!",
+					created_at=datetime(2026, 5, 20, 13, 5, 0)
+				),
+				CommentRead(
+					id=3,
+					email="user3@example.com",
+					content="gemma4:e4b 모델로 요약 속도가 빠른 편인가요?",
+					created_at=datetime(2026, 5, 20, 13, 10, 0)
+				)
+			]
+		),
+		PostRead(
+			id=2,
+			email="test2@example.com",
+			title="Ollama gemma4:e4b 사용 후기",
+			content="로컬 LLM을 FastAPI에 연동해서 게시글 요약 기능을 구현해보았습니다.",
+			likes=0,
+			views=0,
+			created_at=datetime.now(),
+			updated_at=datetime.now(),
+			comments= [
+				CommentRead(
+					id=1,
+					email="user1@example.com",
+					content="FastAPI 정말 편리하네요! 자동 문서화가 최고예요.",
+					created_at=datetime(2026, 5, 20, 13, 0, 0)
+				),
+				CommentRead(
+					id=2,
+					email="user2@example.com",
+					content="Ollama 연동도 잘 되네요. AI 요약 기능 기대돼요!",
+					created_at=datetime(2026, 5, 20, 13, 5, 0)
+				),
+				CommentRead(
+					id=3,
+					email="user3@example.com",
+					content="gemma4:e4b 모델로 요약 속도가 빠른 편인가요?",
+					created_at=datetime(2026, 5, 20, 13, 10, 0)
+				)
+			]
+		),
+		PostRead(
+			id=3,
+			email="test3@example.com",
+			title="Python snake_case vs camelCase",
+			content="FastAPI 프로젝트에서 필드명 컨벤션에 대해 이야기해봅니다.",
+			likes=0,
+			views=0,
+			created_at=datetime.now(),
+			updated_at=datetime.now(),
+			comments= [
+				CommentRead(
+					id=1,
+					email="user1@example.com",
+					content="FastAPI 정말 편리하네요! 자동 문서화가 최고예요.",
+					created_at=datetime(2026, 5, 20, 13, 0, 0)
+				),
+				CommentRead(
+					id=2,
+					email="user2@example.com",
+					content="Ollama 연동도 잘 되네요. AI 요약 기능 기대돼요!",
+					created_at=datetime(2026, 5, 20, 13, 5, 0)
+				),
+				CommentRead(
+					id=3,
+					email="user3@example.com",
+					content="gemma4:e4b 모델로 요약 속도가 빠른 편인가요?",
+					created_at=datetime(2026, 5, 20, 13, 10, 0)
+				)
+			]
+		),
+		PostRead(
+			id=4,
+			email="test4@example.com",
+			title="커뮤니티 사이트 기획 및 개발 과정",
+			content="기획 → 개발 → 배포까지의 전체 과정을 정리했습니다.",
+			likes=0,
+			views=0,
+			created_at=datetime.now(),
+			updated_at=datetime.now(),
+			comments= [
+				CommentRead(
+					id=1,
+					email="user1@example.com",
+					content="FastAPI 정말 편리하네요! 자동 문서화가 최고예요.",
+					created_at=datetime(2026, 5, 20, 13, 0, 0)
+				),
+				CommentRead(
+					id=2,
+					email="user2@example.com",
+					content="Ollama 연동도 잘 되네요. AI 요약 기능 기대돼요!",
+					created_at=datetime(2026, 5, 20, 13, 5, 0)
+				),
+				CommentRead(
+					id=3,
+					email="user3@example.com",
+					content="gemma4:e4b 모델로 요약 속도가 빠른 편인가요?",
+					created_at=datetime(2026, 5, 20, 13, 10, 0)
+				)
+			]
+		),
+	]
+	
+	for post in dummy_posts: 
+		if post.id == post_id:
+			if not post.comments:
+				return SummaryRead(summary="아직 댓글이 없습니다.")
+			
+			comments_text = '\n\n'.join(
+				[f"내용: {comment.content}" for comment in post.comments]
+			)
+
+			prompt = f"""
+						아래 댓글들을 종합해서 한국어로 자연스럽게 요약해주세요.
+						전체적인 주제, 주요 의견, 분위기를 200자 이내로 간결하게 작성해주세요.
+
+						댓글 목록:
+							{comments_text}
+					  """
+			
+			try:
+				response = chat(
+					model='gemma4:e4b',
+					messages=[{'role': 'user', 'content': prompt}]
+				)
+
+				summarized_comments = (response.message.content or "")
+				print(summarized_comments)
+				return SummaryRead(summary=summarized_comments)
+			except Exception as e:
+				raise HTTPException(
+					status_code=500,
+					detail="Ollama 호출 실패: {str(e)} (Ollama 서버가 실행 중인지 확인하세요)"
+				)
+		break
+
