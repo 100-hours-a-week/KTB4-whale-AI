@@ -87,4 +87,15 @@ post_text = "\n\n".join(
   - `SummaryRead(summary=summarized) if summarized is not None else SummaryRead()`: Comprehension 사용
 - (한계) 기획에 따라 HTTP Error가 필요할 수 있으므로, 서비스 기획 상 적절한 해결 방안인지 먼저 논의 필요
 
+### ID counter의 초기화 문제
+
+- (현상) 댓글, 게시글이 있다가 모두 지워졌을 때, ID counter를 초기화하는 로직 존재
+- (원인) 데이터가 지워졌다면 ID counter도 함께 초기화가 필요할 것으로 예상
+- (예상 문제) 초기화 불필요
+  - (가정) 댓글이 10개 있는데 모두 지워진 상태, ID counter도 초기화
+  - (문제 1) 추후 10번 댓글 복구, 삭제된 댓글 다시 보관하는 기능(soft delete)를 추가할 경우 ID 충돌 발생
+  - (문제 2) 클라이언트(프론트엔드)가 10번 댓글을 캐싱하거나 공유 링크로 가지고 있을 가능성, 이 때 재사용하게 되면 다른 댓글 출력됨
+- (실무) 실제 DB(PostgreSQL, MySQL, SQLite 등)에서는 삭제 시, 반드시 auto-increment를 유지함. (항상 증가)
+  - (판단) 리스트가 비었을 때 counter를 초기화하는 것은 임시적 편의일 뿐, **장기적으로는 기술 부채**
+
 ## 260520 - 데이터베이스 적용하기
