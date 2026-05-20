@@ -63,8 +63,13 @@ class SummaryRead(BaseModel):
 with open('dummy.json', encoding="utf-8") as file:
     raw_data = json.load(file)
 posts: List[PostRead] = [PostRead.model_validate(item) for item in raw_data]
-post_id_counter = 1
-comment_id_counter = 1
+
+if posts:
+    post_id_counter = max(post.id for post in posts) + 1
+    comment_id_counter = max(c.id for post in posts for c in post.comments) + 1
+else:
+    post_id_counter = 1
+    comment_id_counter = 1
 
 # ====================== 게시글(Post) 엔드포인트 ======================
 @app.get('/posts', response_model=List[PostRead])
