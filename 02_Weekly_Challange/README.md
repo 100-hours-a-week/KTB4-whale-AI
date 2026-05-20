@@ -35,7 +35,7 @@ pip install "fastapi[standard]" # 라이브러리 설치
 
 ```python
 # 3. 실행
-fastapi dev
+fastapi dev # DB 자동 생성(community.db)
 ```
 
 ### 사용 예시
