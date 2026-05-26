@@ -1,4 +1,4 @@
-# 1 Week Weekly Challange
+# 1 Week Weekly Challenge
 
 ## Auto File Organizer ('afo')
 
@@ -20,7 +20,7 @@
 ```bash
 # 1. Repository 클론 및 이동
 git clone https://github.com/100-hours-a-week/KTB4-whale-AI.git
-cd 01_Weekly_Challange
+cd 01_Weekly_Challenge
 ```
 
 ```python
