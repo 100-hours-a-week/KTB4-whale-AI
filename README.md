@@ -9,3 +9,7 @@
 - 2주차 위클리 챌린지
   - [가이드 바로가기](./02_Weekly_Challenge/README.md)
   - [회고록 바로가기](./02_Weekly_Challenge/RETROSPECTIVE.md)
+
+- 3주차 위클리 챌린지
+  - [가이드 바로가기](./03_Weekly_Challenge/README.md)
+  - [회고록 바로가기](./03_Weekly_Challenge/RETROSPECTIVE.md)
