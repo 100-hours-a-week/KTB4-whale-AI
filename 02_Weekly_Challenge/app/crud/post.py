@@ -11,7 +11,6 @@ def get_posts(session: Session):
 def get_post(post_id: int, session: Session):
     """특정 게시글 조회 (없으면 None 반환)"""
     return session.get(Post, post_id)
-    # raise HTTPException(status_code=404, detail="게시글을 찾을 수 없습니다.")
 
 def create_post(new_post: PostCreate, session: Session):
     """게시글 생성"""
@@ -33,7 +32,6 @@ def update_post(post_id: int, update_data: PostUpdate, session: Session):
         session.commit()
         session.refresh(post)
         return post
-    # raise HTTPException(status_code=404, detail="게시글을 찾을 수 없습니다.")
 
 def delete_post(post_id: int, session: Session):
     """게시글 삭제 (성공하면 True, 실패하면 False)"""
@@ -44,7 +42,6 @@ def delete_post(post_id: int, session: Session):
         session.commit()
         return True
     return False
-    # raise HTTPException(status_code=404, detail="게시글을 찾을 수 없습니다.")
 
 # ====================== 조회수 & 좋아요 ======================
 def increment_view(post_id: int, session: Session):
@@ -56,7 +53,6 @@ def increment_view(post_id: int, session: Session):
         session.refresh(post)
         return post.views
     return None
-    # raise HTTPException(status_code=404, detail="게시글을 찾을 수 없습니다.")
 
 def increment_like(post_id: int, session: Session):
     post = session.get(Post, post_id)
@@ -67,4 +63,3 @@ def increment_like(post_id: int, session: Session):
         session.refresh(post)
         return post.likes
     return None
-    # raise HTTPException(status_code=404, detail="게시글을 찾을 수 없습니다.")

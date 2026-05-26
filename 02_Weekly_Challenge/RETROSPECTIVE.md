@@ -132,7 +132,7 @@ post_text = "\n\n".join(
     - RDB(직접 SQL)
     - ORM(추상화)
     - NoSQL(다른 패러다임)
-  - 진입 장벽이 낮은 ORM(SQLModel)부터, MySQL + SQLAlchemy, (Raw SQL) MySQL, (NoSQL) MongoDB 순으로 학습 예정
+  - 진입 장벽이 낮은 ORM(SQLModel) &rarr; MySQL + SQLAlchemy &rarr; (Raw SQL) MySQL &rarr; (NoSQL) MongoDB 순으로 학습 예정
     - 러닝 커브가 낮다면, 그만큼 구체적인 내용이 생략되어 있음을 의미한다.
     - 따라서, 순서대로 학습하면서 어떤 부분이 생략되어 있는지, 차이점을 이해하는 것을 목표로 한다.
 

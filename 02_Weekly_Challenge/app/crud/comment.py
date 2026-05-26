@@ -4,7 +4,6 @@ from sqlmodel import Session
 
 def create_comment(post_id: int, new_comment: CommentCreate, session: Session):
     post = session.get(Post, post_id)
-
     if post:
         comment = Comment.model_validate(new_comment)
         comment.post_id = post_id
@@ -13,7 +12,6 @@ def create_comment(post_id: int, new_comment: CommentCreate, session: Session):
         session.refresh(comment)
         return comment
     return None
-    # raise HTTPException(status_code=404, detail="게시글을 찾을 수 없습니다.")
     
 def update_comment(post_id: int, comment_id: int, update_data: CommentUpdate, session: Session):
     comment = session.get(Comment, comment_id)
@@ -24,7 +22,6 @@ def update_comment(post_id: int, comment_id: int, update_data: CommentUpdate, se
         session.refresh(comment)
         return comment
     return None
-    # raise HTTPException(status_code=404, detail="댓글을 찾을 수 없습니다.")
 
 def delete_comment(post_id: int, comment_id: int, session: Session):
     comment = session.get(Comment, comment_id)
@@ -33,4 +30,4 @@ def delete_comment(post_id: int, comment_id: int, session: Session):
         session.commit()
         return True
     return False
-    # raise HTTPException(status_code=404, detail="게시글을 찾을 수 없습니다.")
+    
