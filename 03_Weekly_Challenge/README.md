@@ -6,7 +6,7 @@
 2. [Pandas 미니퀘스트 수행](./02_Pandas_Quests.ipynb)
    1. DataFrame 생성 및 groupby 기능 활용 ✅
    2. DataFrame 생성 및 필터링 기능 활용 ✅
-3. 🚧 데이터 시각화(미정)
+3. [Matplotlib 미니퀘스트 수행](./03_Matplotlib_Quests.ipynb)
 
 ## 회고록
 
