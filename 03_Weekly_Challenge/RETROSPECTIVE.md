@@ -80,3 +80,29 @@ print(high_total)
   - 방법 1은 하드코딩 되어있어, 새로운 과목이 들어올 때 대응하기 어려움
   - 방법 2는 과목만 대응 가능, 새로운 컬럼(ID, 반, 평균 등)이 들어올 때 대응하기 어려움
   - 방법 3는 성적만이 숫자로 들어온다는 가정 (한계: 과목 외 숫자값이 들어올 경우 대응하기 어려움)
+
+#### lambda 사용 시 타입 에러 발생
+
+```python
+# DataFrame 생성 및 filtering 기능 활용
+# =================== DataFrame 생성 ===================
+df = pd.DataFrame(data)
+print("✅ 회사 직원 정보 DataFrame 생성")
+print(df)
+
+# =================== filtering 기능 활용 ===================
+# 1. 그룹화 후 필터링
+grouped_1 = df.groupby('부서') # 분할: 부서 기준으로 그룹 분할
+filtered = grouped_1.filter(lambda x: x['급여'].mean() > 5000) # 적용 및 결합 # type: ignore
+print("\n✅ [1. 그룹화 후 필터링] groupby로 부서별 급여 평균 중 5000 초과 직원 산출")
+print(filtered)
+```
+
+- 에러: `ParamSpec "P@filter"에 대한 인수가 없습니다.`
+- `# type: ignore`를 추가하여 타입 에러 일시적 해결
+- 근본적인 원인 해결 필요
+- AI 왈: pandas + Pylance 조합의 현재 한계
+  - 자주 발생하는 타입 체커 버그
+  - 💡 실무 규칙:
+    - `groupby.filter()`는 편리하지만 타입 이슈가 자주 발생
+    - 복잡한 그룹 필터링은 `transform()` + mask 조합을 기본으로 사용
