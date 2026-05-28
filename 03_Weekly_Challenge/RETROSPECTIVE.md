@@ -138,3 +138,62 @@ print(filtered)
   - 💡 실무 규칙:
     - `groupby.filter()`는 편리하지만 타입 이슈가 자주 발생
     - 복잡한 그룹 필터링은 `transform()` + mask 조합을 기본으로 사용
+
+## Matplotlib
+
+### (Seaborn) 금융데이터 3번 문제
+
+```python
+# 3번 퀘스트
+# df 데이터프레임에서
+# 주간(7일) 단위로 종가(Close) 평균을 리샘플링한 후,
+# 이를 바탕으로 주간 변동성(표준편차)을 계산하기
+date_rng = pd.date_range(start='2024-01-01', periods=30, freq='D')
+close_prices = np.random.uniform(100, 200, size=len(date_rng))  # 100~200 사이의 랜덤 종가 생성
+
+df = pd.DataFrame({
+    "datetime": date_rng,
+    "close": close_prices
+})
+
+# 1. datetime를 인덱스로 설정
+df.set_index('datetime', inplace=True)
+
+# (문제) ❌ rolling(window=7).std()로 표준편차를 구하면 안되는 이유: 인덱스 미스 조정 문제 발생
+# # 2. 1일(D) -> 7일(W)로 다운샘플링
+# df_week = df.resample('W').mean()
+# print(df_week.head().reset_index())
+
+# # 3. 주간 변동성(표준편차) 계산
+# df_week['volatility'] = df['close'].rolling(window=7).std()
+# print(df_week.head(10).reset_index())
+
+# (AI 추천 방식) 💡 다운샘플링 과정에서 같이 결과를 가져오므로, 인덱스 미스 조정 문제가 발생하지 않음.
+df_week = df.resample('W').agg({
+    'close': ['mean', 'std']
+})
+df_week.columns = ['close_mean', 'volatility']
+print(df_week)
+```
+
+1. `df_week = df.resample('W').mean()`
+   - df_week는 7일로 다운샘플링 되었으므로, 인덱스는 주간 날짜 5개로 만들어짐.
+   - 예시: 2024-01-07, 2024-01-14, 2024-01-21, 2024-01-28, 2024-02-04
+     - 2024-01-01 ~ 2024-01-07 -> 2024-01-07로 다운샘플링
+     - ... (계속 7일 진행)
+     - 2024-01-29 ~ 2024-01-30 -> 2024-02-04로 다운샘플링
+     - (소결) 마지막 주는 2일 밖에 없지만, 계산 결과를 7일 뒤 날짜로 주간 날짜를 인덱스로 하여 값을 적용
+
+2. `df['close'].rolling(window=7).std()`
+   - 해당 과정은 df 인덱스(일간 날짜) 기준으로 단순 이동 평균(rolling) 진행된다.
+   - 따라서, 결과물도 일간 날짜 30개로 만들어진다.
+
+3. `df_week['volatility']에 할당`
+   - df_week에 일간 날짜 30개를 할당하려 할 때, pandas는 두 인덱스를 비교해서 인덱스가 같으면 그 값을 가져온다.
+   - 현재 인덱스가 주간 날짜, 일간 날짜이므로, 같은 날짜일 때 그 값을 가져온다.
+   - df_week의 마지막 주는 단순 이동 평균 데이터프레임에서 생길 수 없으므로, NaN이 할당된다.
+
+4. 결론
+   - resample('W').mean()에서는 인덱스(마지막 주)가 2024-02-04이고, 값이 생기지만
+   - rolling(단순 이동 평균)에서는 인덱스가 2024-01-30이므로, df_week에 할당할 때 값이 NaN이 할당된다.
+   - 따라서 사용하면 안 된다.
