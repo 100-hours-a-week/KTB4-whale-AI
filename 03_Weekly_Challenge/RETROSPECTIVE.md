@@ -7,15 +7,13 @@
 - `np.uint8`은 0~255까지만 저장할 수 있는 타입(1바이트)
 
 1. (방법 1) 생성 시점저에 값을 넣을 때
-
-- NumPy는 이 값이 정말 uint8에 들어갈 수 있는지 엄격히 검사
-- 300은 uint8 범위를 벗어나기 떄문에 OverflowError로 데이터 손실을 미리 막아줌
+   - NumPy는 이 값이 정말 uint8에 들어갈 수 있는지 엄격히 검사
+   - 300은 uint8 범위를 벗어나기 떄문에 OverflowError로 데이터 손실을 미리 막아줌
 
 2. (방법 2) 나중에 변환할 떄
-
-- 기본 동작이 `casting='unsafe'` (안전하지 않은 허용)
-- 범위를 벗어나는 값은 자동으로 wrap around(Modulo 256) 처리
-- 300 % 256 = 44가 된다.
+   - 기본 동작이 `casting='unsafe'` (안전하지 않은 허용)
+   - 범위를 벗어나는 값은 자동으로 wrap around(Modulo 256) 처리
+   - 300 % 256 = 44가 된다.
 
 ### 인덱스
 
@@ -80,6 +78,40 @@ print(high_total)
   - 방법 1은 하드코딩 되어있어, 새로운 과목이 들어올 때 대응하기 어려움
   - 방법 2는 과목만 대응 가능, 새로운 컬럼(ID, 반, 평균 등)이 들어올 때 대응하기 어려움
   - 방법 3는 성적만이 숫자로 들어온다는 가정 (한계: 과목 외 숫자값이 들어올 경우 대응하기 어려움)
+
+#### groupby에서 agg 함수 사용 방법
+
+```python
+grouped_1 = df.groupby('부서')
+aggregated = grouped_1.agg('sum')
+```
+
+```python
+grouped_1 = df.groupby('부서')
+aggregated = grouped_1['급여'].agg('sum')
+```
+
+```python
+grouped_1 = df.groupby('부서')
+aggregated = grouped_1['급여'].agg(lambda x: sum(x) + 2)
+```
+
+```python
+grouped_1 = df.groupby('부서')
+aggregated = grouped_1.agg({
+  '근속연수': 'max',
+  '급여': ['sum', 'mean', 'max', 'min']
+})
+```
+
+```python
+import pandas as pd
+grouped_1 = df.groupby('부서')
+aggregated = grouped_1.agg(
+  급여_mean=pd.NamedAgg(column="급여", aggfunc="mean")
+  근속연수_max=pd.NamedAgg(column="근속연수", aggfunc="max")
+)
+```
 
 #### lambda 사용 시 타입 에러 발생
 
