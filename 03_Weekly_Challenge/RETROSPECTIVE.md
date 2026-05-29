@@ -197,3 +197,34 @@ print(df_week)
    - resample('W').mean()에서는 인덱스(마지막 주)가 2024-02-04이고, 값이 생기지만
    - rolling(단순 이동 평균)에서는 인덱스가 2024-01-30이므로, df_week에 할당할 때 값이 NaN이 할당된다.
    - 따라서 사용하면 안 된다.
+
+### (SciPy) 통계 계산한 분석 결과를 활자로 어떻게 표현할 것인지 정리
+
+```python
+# 3번 퀘스트
+# 분산 분석(ANOVA, Analysis of Variance)을 수행하여
+# 여러 그룹의 평균이 서로 다른지 검정하기
+np.random.seed(42)
+group_1 = np.random.normal(loc=50, scale=10, size=30)  # 평균 50, 표준편차 10
+group_2 = np.random.normal(loc=55, scale=10, size=30)  # 평균 55, 표준편차 10
+group_3 = np.random.normal(loc=60, scale=10, size=30)  # 평균 60, 표준편차 10
+
+f_stat, p_value = stats.f_oneway(group_1, group_2, group_3)
+print(f"f_stat: {f_stat}") # f_stat는 약 12.2095
+print(f"p_value: {p_value}") # p_value는 약 0.0000212(0.002%)
+alpha = 0.05
+if p_value < alpha:
+    print("유의미한 차이가 있습니다. (p = {:.7f})".format(p_value))
+else:
+    print("유의미한 차이가 없습니다.")
+```
+
+1. (f_stat) 그룹 내외 분산 크기 파악 비교하기
+   - f_stat는 그룹 간 차이가 그룹 내 변동보다 어느 정도 큰지를 의미
+   - f_stat가 12.2095이므로, 그룹 간 차이가 그룹 내 변동보다 12배 크다는 뜻
+   - (결론) 그룹 간 차이가 그룹 내 변동보다 훨씬 크다는 의미
+2. (p_value) 서로 다른 세 그룹의 평균이 다른지 아닌지 판단하기
+   - p-value는 관측된 차이가 우연일 확률이므로, 이 문제에서 0.0000212(0.002%)
+   - alpha는 유의미하다고 인정하는 최대 확률이고, 일반적으로 5% (= 최대 5%까지 유의미하다는 의미)
+   - (결론) 세 그룹은 서로 다르다.(유의미) (0.0000212 < 0.05이므로, 세 그룹은 서로 같다는 귀무가설 기각)
+     - 세 그룹의 평균이 모두 같다는 가설은 거의 확실히 틀렸다는 의미
