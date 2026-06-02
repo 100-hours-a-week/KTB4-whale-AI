@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.venv/
+.afo_backup/
+*.egg-info/
+.DS_Store
