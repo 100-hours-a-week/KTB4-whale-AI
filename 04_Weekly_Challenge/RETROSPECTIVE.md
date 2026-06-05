@@ -85,6 +85,13 @@
    - (해결) Sigmoid 함수의 등장
      - 역전파의 연쇄 법칙(체인 룰)을 반영하기 위해 미분 가능한 활성화 함수 필요
      - Sigmoid는 해당 문제를 해결하면서, 0 또는 1로만 출력 가능해 생물학적 유사성도 가짐
+   - (기타) 깊이 다룰만한 주제
+     - 비선형(Non-linearity)가 왜 필요한가?
+     - Vanishing Gradient 문제의 메커니즘
+     - Dying ReLU 문제(왜 한 번 죽은 뉴런은 회복이 안 되는가)
+     - GELU의 설계 철학: 왜 단순한 ReLU가 아니라 확률적 특성을 섞었는가?
+     - 활성화 함수와 Optimizer의 상호작용: Adam + ReLU 조합이 왜 잘 맞는가?
+     - 현대 모델에서 활성화 함수 선택의 기준: ResNet vs Transformer vs MLP-Mixer 등의 차이
 
 3. ⚠️ backward가 누적 합산을 default로 선택하는 이유
    - (배경) 실제 모델 학습 순서를 코드 레벨에서 살펴보면 zero_gred 메서드로 gredient를 초기화하고, backward를 진행
