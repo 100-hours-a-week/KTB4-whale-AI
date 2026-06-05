@@ -1,4 +1,4 @@
-# 1 Week Weekly Challenge
+# Week 1 - Weekly Challenge
 
 ## Auto File Organizer ('afo')
 

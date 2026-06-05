@@ -1,4 +1,4 @@
-# 2 Week Weekly Challenge
+# Week 2 - Weekly Challenge
 
 ## 개요
 
