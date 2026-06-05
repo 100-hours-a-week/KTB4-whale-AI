@@ -1,4 +1,4 @@
-# 3 Week Weekly Challenge
+# Week 3 - Weekly Challenge
 
 ## 챌린지 결과
 
