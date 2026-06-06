@@ -38,7 +38,6 @@ def evaluate(inputs, outputs, weights, bias):
 
 def _predict_single(input_data, weights, bias):
     total_input = np.dot(input_data, weights) + bias
-    print(total_input)
     return _step_function(total_input)
 
 def _step_function(x):
