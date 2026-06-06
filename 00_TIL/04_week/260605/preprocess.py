@@ -54,20 +54,20 @@ def _step_function(x):
     return 1 if x >= 0 else 0
 
 # TODO: 변경 필요
-def _sigmoid_function(x):
-    return 1 if x >= 0 else 0
+# def _sigmoid_function(x):
+#     return 1 if x >= 0 else 0
 
-def _tanh_function(x):
-    return 1 if x >= 0 else 0
+# def _tanh_function(x):
+#     return 1 if x >= 0 else 0
 
-def _relu_function(x):
-    return 1 if x >= 0 else 0
+# def _relu_function(x):
+#     return 1 if x >= 0 else 0
 
-def _leaky_relu_function(x):
-    return 1 if x >= 0 else 0
+# def _leaky_relu_function(x):
+#     return 1 if x >= 0 else 0
 
-def _gelu_function(x):
-    return 1 if x >= 0 else 0
+# def _gelu_function(x):
+#     return 1 if x >= 0 else 0
 
-def _silu_function(x):
-    return 1 if x >= 0 else 0
+# def _silu_function(x):
+#     return 1 if x >= 0 else 0

@@ -18,13 +18,13 @@ def train_perceptron(index, inputs, outputs, weights, bias, learning_rate, activ
 
     # Weight(with Bias) Update (Backward + Optimizer)
     # Optimizer: 고정된 learning_rate를 사용한 확률적 경사하강법(SGD) 스타일
-    update_weights = weights + learning_rate * loss * inputs[index]
-    update_bias = bias + learning_rate * loss
+    new_weights = weights + learning_rate * loss * inputs[index]
+    new_bias = bias + learning_rate * loss
     print(f"→ weights += {learning_rate} * {loss} * {inputs[index]}")
     print(f"→ bias += {learning_rate} * {loss}")
-    print(f"→ 업데이트 후 new_weights = {update_weights.round(4)}, new_bias = {update_bias.round(4)}")
+    print(f"→ 업데이트 후 new_weights = {new_weights.round(4)}, new_bias = {new_bias.round(4)}")
 
     return SimpleNamespace(
-        weights=update_weights,
-        bias=update_bias
+        weights=new_weights,
+        bias=new_bias
     )
