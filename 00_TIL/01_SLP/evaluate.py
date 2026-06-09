@@ -1,7 +1,6 @@
 import numpy as np
-from preprocess import _sigmoid_function
 
-def evaluate(inputs, outputs, W1, b1, W2, b2):
+def evaluate(inputs, outputs, weights, bias):
     """
         모델 평가하기
         - 예측 결과 출력
@@ -18,7 +17,7 @@ def evaluate(inputs, outputs, W1, b1, W2, b2):
     print("-"*60)
 
     for i, input_data in enumerate(inputs):
-        pred_value = _predict_single(input_data, W1, b1, W2, b2)
+        pred_value = _predict_single(input_data, weights, bias)
         true_value = outputs[i]
         is_correct = (pred_value == true_value)
 
@@ -37,16 +36,9 @@ def evaluate(inputs, outputs, W1, b1, W2, b2):
     print(f"정확도 (Accuracy): {correct}/{total} = {accuracy:.2%}")
     print("="*60)
 
-def _predict_single(input_data, W1, b1, W2, b2):
-    """단일 입력에 대한 MLP 순전파"""
-    x = input_data.reshape(1, -1)           # (1, 2)
+def _predict_single(input_data, weights, bias):
+    total_input = np.dot(input_data, weights) + bias
+    return _step_function(total_input)
 
-    # Forward
-    z1 = np.dot(x, W1) + b1
-    a1 = _sigmoid_function(z1)
-
-    z2 = np.dot(a1, W2) + b2
-    a2 = _sigmoid_function(z2)
-
-    # Sigmoid 출력 → 0.5 기준으로 이진 분류
-    return 1 if a2[0, 0] >= 0.5 else 0
+def _step_function(x):
+    return 1 if x >= 0 else 0

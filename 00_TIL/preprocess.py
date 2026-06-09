@@ -1,7 +1,7 @@
 import numpy as np
 from types import SimpleNamespace
 
-def preprocess(inputs, outputs, weights_num, bias_num, learning_rate, activate = 'step'):
+def preprocess(inputs, outputs, weights_num, bias_num, hidden_size, learning_rate, activate = 'step'):
     """
         데이터 전처리
         - 데이터셋 분할
@@ -19,31 +19,35 @@ def preprocess(inputs, outputs, weights_num, bias_num, learning_rate, activate =
     
     # weights, bias 초기화
     np.random.seed(42) # 재현성을 위해 시드 고정
-    weights = np.random.rand(weights_num) # [0, 1) 사이 균등 분포(Uniform Distribution)에서 난수 선택
-    bias = np.random.rand(bias_num)
+    # 입력 → 은닉층
+    W1 = np.random.randn(weights_num, hidden_size) * 0.5
+    b1 = np.zeros((1, hidden_size))
+
+    # 은닉층 → 출력층
+    W2 = np.random.randn(hidden_size, 1) * 0.5
+    b2 = np.zeros((1, 1))
 
     # activate_f
-    activate_f = _step_function
+    activate_f = _sigmoid_function
 
     return SimpleNamespace(
         train_inputs=train_inputs,
         train_outputs=train_outputs,
         test_inputs=test_inputs,
         test_outputs=test_outputs,
-        weights=weights,
-        bias=bias,
+        W1=W1, b1=b1,                     # [변경]
+        W2=W2, b2=b2,                     # [변경]
         learning_rate=learning_rate,
         activate_f=activate_f
     )
 
 def _step_function(x):
-
     return 1 if x >= 0 else 0
 
-# TODO: 변경 필요
-# def _sigmoid_function(x):
-#     return 1 if x >= 0 else 0
+def _sigmoid_function(x):
+    return 1 / (1 + np.exp(-np.clip(x, -500, 500))) # overflow 방지
 
+# TODO: 변경 필요
 # def _tanh_function(x):
 #     return 1 if x >= 0 else 0
 
