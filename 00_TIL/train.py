@@ -29,8 +29,31 @@ class Trainer:
         # 1. Forward
         output = self.model.forward(x)
         # 2. Loss (MSE)
-        loss = np.mean((output - y) ** 2) # 손실(실제값 - 예측값) 계산
+        loss = self.loss_function(output, y)
         # 3. Backward
         self.model.backward(x, y)
 
         return loss
+    
+    def loss_function(self, output, y, type = 'mse'):
+        if type == 'bce':
+            return self._bce(output, y)
+        elif type == 'mae':
+            return self._mae(output, y)
+        else:
+            return self._mse(output, y)
+
+    # 회귀 문제일 때, loss 함수
+    def _mse(self, output, y):
+        return np.mean((output - y) ** 2)
+    
+    def _mae(self, output, y):
+        """Mean Absolute Error (MAE)"""
+        return np.mean(np.abs(output - y))
+
+    # 분류 문제일 때, loss 함수
+    def _bce(self, output, y):
+        """Binary Cross Entropy (BCE)"""
+        # 이진 분류용
+        output = np.clip(output, 1e-15, 1 - 1e-15)
+        return -np.mean(y * np.log(output) + (1 - y) * np.log(1 - output))
