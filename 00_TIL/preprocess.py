@@ -1,64 +1,67 @@
 import numpy as np
 from types import SimpleNamespace
 
-def preprocess(inputs, outputs, weights_num, bias_num, hidden_size, learning_rate, activate = 'step'):
+class Preprocessor:
     """
         데이터 전처리
-        - 데이터셋 분할
         - 가중치, 편향 초기화
         - 활성화 함수 선택
-            - 인공신경망에서 뉴런의 출력을 결정하는 "비선형" 함수
     """
 
-    # inputs, outputs
-    # TODO: train, test 데이터셋 분할
-    train_inputs = inputs
-    train_outputs = outputs
-    test_inputs = inputs
-    test_outputs = outputs
+    def __init__(self):
+        pass
+
+    def activate_function(self, x, activate_type = 'sigmoid'):
+        if activate_type == 'sigmoid':
+            return self._sigmoid(x)
+        else: # sigmoid
+            return self._sigmoid(x)
     
-    # weights, bias 초기화
-    np.random.seed(42) # 재현성을 위해 시드 고정
-    # 입력 → 은닉층
-    W1 = np.random.randn(weights_num, hidden_size) * 0.5
-    b1 = np.zeros((1, hidden_size))
+    def derivative_function(self, x, type = 'sigmoid'):
+        if type == 'sigmoid':
+            return self._sigmoid_derivative(x)
+        else:
+            return self._sigmoid_derivative(x)
+    
+    def initialize_weights(self, input_size, hidden_size, output_size):
+        np.random.seed(42) # 재현성을 위해 시드 고정
+        SCALING_SIZE = 0.5
+        # 입력 → 은닉층
+        W1 = np.random.randn(input_size, hidden_size) * SCALING_SIZE
+        b1 = np.zeros((1, hidden_size))
 
-    # 은닉층 → 출력층
-    W2 = np.random.randn(hidden_size, 1) * 0.5
-    b2 = np.zeros((1, 1))
+        # 은닉층 → 출력층
+        W2 = np.random.randn(hidden_size, output_size) * SCALING_SIZE
+        b2 = np.zeros((1, output_size))
 
-    # activate_f
-    activate_f = _sigmoid_function
+        return { "W1": W1, "b1": b1, "W2": W2, "b2": b2 }
 
-    return SimpleNamespace(
-        train_inputs=train_inputs,
-        train_outputs=train_outputs,
-        test_inputs=test_inputs,
-        test_outputs=test_outputs,
-        W1=W1, b1=b1,                     # [변경]
-        W2=W2, b2=b2,                     # [변경]
-        learning_rate=learning_rate,
-        activate_f=activate_f
-    )
+    # activate
+    def _step_function(self, x):
+        return 1 if x >= 0 else 0
+    
+    def _sigmoid(self, x):
+        return 1 / (1 + np.exp(-np.clip(x, -500, 500))) # Overflow 방지를 위해 (-500 ~ +500)
 
-def _step_function(x):
-    return 1 if x >= 0 else 0
+    # derivative
+    def _sigmoid_derivative(self, x):
+        s = self._sigmoid(x)
+        return s * (1 - s)
+    
+    # TODO: 변경 필요
+    # def _tanh(x):
+    #     return 1 if x >= 0 else 0
 
-def _sigmoid_function(x):
-    return 1 / (1 + np.exp(-np.clip(x, -500, 500))) # overflow 방지
+    # def _relu(x):
+    #     return 1 if x >= 0 else 0
 
-# TODO: 변경 필요
-# def _tanh_function(x):
-#     return 1 if x >= 0 else 0
+    # def _leaky_relu(x):
+    #     return 1 if x >= 0 else 0
 
-# def _relu_function(x):
-#     return 1 if x >= 0 else 0
+    # def _gelu(x):
+    #     return 1 if x >= 0 else 0
 
-# def _leaky_relu_function(x):
-#     return 1 if x >= 0 else 0
+    # def _silu(x):
+    #     return 1 if x >= 0 else 0
 
-# def _gelu_function(x):
-#     return 1 if x >= 0 else 0
-
-# def _silu_function(x):
-#     return 1 if x >= 0 else 0
+    
