@@ -57,3 +57,13 @@ class Trainer:
         # 이진 분류용
         output = np.clip(output, 1e-15, 1 - 1e-15)
         return -np.mean(y * np.log(output) + (1 - y) * np.log(1 - output))
+    
+    def _hinge(self, output, y):
+        """
+            Hinge
+            - y: 정답 라벨 (-1 or 1)
+            - output: 모델의 raw 출력(0, 1 - y * output)
+        """
+        return np.mean(np.maximum(0, 1 - y * output))
+    
+    # TODO: 제곱 힌지 로스 함수도 있던데, 무슨 차이인지 확인 필요
