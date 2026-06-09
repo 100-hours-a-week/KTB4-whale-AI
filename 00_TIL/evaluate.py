@@ -21,7 +21,7 @@ class Evaluator:
         print("-"*60)
 
         for i, input_data in enumerate(inputs):
-            y = input_data.reshape(-1, 1) # shape 결과: (2,) -> (1, 2)
+            y = input_data.reshape(1, -1) # shape 결과: (2,) -> (1, 2)
             output = self.model.forward(y)
             pred_value = 1 if output[0, 0] >= 0.5 else 0 # 평가할 때는 step function
             true_value = outputs[i]
