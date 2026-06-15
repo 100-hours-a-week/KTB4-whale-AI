@@ -2,8 +2,8 @@
 
 ## 챌린지
 
-- [[01\_과제 바로가기](./01_VGG16/01_Challenge.ipynb)] 이미지 데이터셋과 사전 훈련된 VGG16 모델을 가져와 전이 학습 수행하기
-- [[02\_과제 바로가기](./02_ResNet/01_Challenge.ipynb)] ResNet 모델을 불러와 새로운 이미지 데이터셋 분류하기
+- [[02\_과제 바로가기](./01_ResNet/01_Challenge.ipynb)] ResNet 모델을 불러와 새로운 이미지 데이터셋 분류하기
+- [[01\_과제 바로가기](./02_VGG16/01_Challenge.ipynb)] 이미지 데이터셋과 사전 훈련된 VGG16 모델을 가져와 전이 학습 수행하기
 - 동일한 데이터셋에서 ResNet과 VGG16 모델을 각각 학습시켜 성능 비교하기 (과제 1, 2로 대체, 회고록 참고)
 - [[04\_과제 GridSearch 바로가기](./04_Hyperparameter_Tuning/01_Challenge_GridSearch.ipynb)] [[04\_과제 RandomSearch 바로가기](./04_Hyperparameter_Tuning/02_Challenge_RandomSearch.ipynb)]가상 데이터셋을 생성한 뒤, GridSearch와 RandomSearch 기법으로 하이퍼파라미터 튜닝하기
 - [[05\_과제 바로가기](./05_Chat_Bot/01_Challenge.ipynb)] 한국어 챗봇 만들기
