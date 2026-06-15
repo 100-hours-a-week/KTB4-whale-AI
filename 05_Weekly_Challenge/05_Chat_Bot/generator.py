@@ -1,28 +1,80 @@
+from typing import Optional
 import random
 
-def dummy_generate(prompt: str, max_length: int = 50) -> str:
+def generate(
+    prompt: str,
+    max_new_tokens: int = 30,
+    stop_sequences: Optional[list[str]] = None
+) -> str:
     """
-    단계 1용 Dummy Generator.
-    나중에 이 함수를 진짜 모델 호출 코드로 완전히 교체할 예정입니다.
+    단계 2: 반복 호출로 문장을 완성하는 간이 생성기.
+    
+    TODO: 나중에 이 함수 내부를 진짜 모델 기반 생성 로직으로 교체할 예정입니다.
     """
-    responses = [
-        "알겠습니다. 더 자세히 말씀해 주세요.",
-        "그렇군요. 계속 말씀해 주세요.",
-        "흥미로운 이야기네요.",
-        "네, 이해했습니다.",
+    if stop_sequences is None:
+        stop_sequences = []
+
+    current_text = prompt
+    last_chunk = ""
+    generated_tokens = 0
+
+    for _ in range(max_new_tokens):
+        # === 여기서 "다음 조각"을 생성 ===
+        # 단계 2에서는 간단한 규칙/로직으로 다음 조각을 만듭니다.
+        next_chunk = _get_next_chunk(current_text, last_chunk)
+
+        current_text += next_chunk
+        last_chunk = next_chunk
+        generated_tokens += 1
+
+        # 종료 조건 체크
+        if _should_stop(current_text, stop_sequences):
+            break
+
+        # 너무 길어지면 강제 종료
+        if generated_tokens >= max_new_tokens:
+            break
+
+    return current_text
+
+
+def _get_next_chunk(current_text: str, last_chunk: str = "") -> str:
+    """
+    단계 2용 임시 로직.
+    나중에 이 함수를 '모델이 다음 토큰을 예측하는 로직'으로 교체합니다.
+    """
+    text = current_text.lower()
+
+    # 1. 특정 키워드에 따른 응답
+    if "날씨" in text and "좋" not in text:
+        return " 좋아서"
+    elif "좋아서" in text and "산책" not in text:
+        return " 산책하기"
+    elif "산책하기" in text and "좋" not in text:
+        return " 좋아요."
+
+    # 2. 기본 응답 (다양하게 여러 개 준비)
+    default_responses = [
+        " 알겠습니다.",
+        " 더 말씀해 주세요.",
+        " 이해했습니다.",
+        " 계속 말씀해 주세요.",
+        " 네, 그렇군요.",
     ]
-    
-    # prompt에 특정 단어가 있으면 그에 맞는 답변
-    if "날씨" in prompt:
-        base = "좋아서 외출하기 좋은 날씨예요."
-    elif "안녕" in prompt or "반가" in prompt:
-        base = "반가워요! 오늘 하루는 어떠세요?"
-    else:
-        base = random.choice(responses)
-    
-    # 간단한 길이 제한 (실제 모델에서는 더 정교하게 처리)
-    full_text = prompt + " " + base
-    if len(full_text) > max_length:
-        full_text = full_text[:max_length]
-    
-    return full_text
+
+    # 마지막에 생성한 것과 같은 응답은 제외
+    available = [r for r in default_responses if r != last_chunk]
+
+    # 사용 가능한 응답이 없으면 전체에서 랜덤 선택
+    if not available:
+        available = default_responses
+
+    return random.choice(available)
+
+
+def _should_stop(current_text: str, stop_sequences: list[str]) -> bool:
+    """특정 단어가 나오면 생성을 멈춤"""
+    for seq in stop_sequences:
+        if seq in current_text:
+            return True
+    return False
