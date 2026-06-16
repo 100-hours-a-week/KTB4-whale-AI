@@ -88,3 +88,38 @@
 
 - 개념 이해와 코드 구현 사이에는 상당한 간극이 존재
 - 이를 메우기 위해서는 **작은 단위로 점진적으로 구현하는 것이 효과적**임을 배움
+
+## 트러블 슈팅 4 - Causal Mask의 차원에 따른 코드 수정 위치 정립 (Single Head vs Multi-Head)
+
+### 문제 상황
+
+- `ScaledDotProductAttention` 테스트 중 Causal Mask를 적용했을 때, mask 차원에 따라 결과 shape이 깨지는 현상 발생
+- 처음 AI가 제공한 테스트 코드에서는 테스트용 mask가 4차원으로 생성했으나, `scores`가 3차원이라 broadcasting이 실패하면서 shape이 비정상적으로 변형됨
+- 이 과정에서 **"테스트 코드를 수정해야 하는지, 아니면 `ScaledDotProductAttention` 내부 코드를 수정해야 하는지"** 코드 수정 위치에 따른 "책임 분리 결정"에 대한 고민
+
+### 원인 분석
+
+- `ScaledDotProductAttention`의 `scores`는 `(batch, seq, seq)` 형태의 **3차원** 텐서
+- Multi-Head Attention으로 확장하면 `scores`가 `(batch, heads, seq, seq)` 형태의 **4차원**이 됨
+- 따라서 mask 차원도 단계에 따라 다르게 구성해야 함
+- 차원 개수가 맞지 않으면 `masked_fill`에서 broadcasting이 깨져 shape이 비정상적으로 변형
+
+### 결정 및 대응
+
+- 최종 결정:
+  - 테스트 코드를 수정하여 mask를 3차원으로 맞추는 방향으로 진행
+  - `ScaledDotProductAttention` 내부에서 mask 차원을 자동으로 맞추는 로직은 추가하지 않음
+
+### 결정 이유
+
+- 현재 `ScaledDotProductAttention` 단계는 Mask의 결과가 **3차원** `(batch, seq, seq)` 또는 `(1, seq, seq)`으로 구성되는 것은 정상
+- 이는 **현재 단계에서 테스트의 범주**이며 추후 Multi-Head 까지 확장하여 고려하면, 테스트 코드는 3차원, n차원 등 어떤 차원이든 동일한 결과가 나와야 하는 것도 설득력있는 설계 방법으로 고려할 수 있음.(예시: `shape: (batch_size, n_den, ...)`)
+- 다만 지금은 Single Head이므로 테스트의 범주를 고려했을 때, `ScaledDotProductAttention` 내부에서 mask 차원을 자동으로 맞추는 로직은 과도한 일반화로 판단하여 현재는 추가하지 않음
+- 대신 해당 설계 방법은 추후 확장 과정에서 유의미한 설계 아이디어이므로, `test_attention.py`에 **TODO 주석을 추가**하여 Multi-Head 구현 시 mask 차원 변경이 필요함을 명시
+
+### 인사이트
+
+- Attention 구현 시 mask 차원 관리가 매우 중요함
+- mask 차원이 맞지 않을 때, **어디를 수정할 것인가**에 대한 판단 기준을 세우는 것을 고민
+- Single Head와 Multi-Head 단계에서 mask 차원이 달라질 수 있으므로, 단계별로 mask 구성을 명확히 구분해야 함
+- 차원 불일치로 인한 에러는 디버깅이 어렵기 때문에, 추후 작업으로 표시하고, 현재는 테스트 코드를 수정하는 단계로 변경
