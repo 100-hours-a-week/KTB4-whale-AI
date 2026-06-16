@@ -4,7 +4,9 @@
 
 - **단계 1**: FastAPI 기본 구조 + Dummy Generator 완료
 - **단계 2**: 반복 호출 방식의 간이 생성기 완료 (규칙 기반)
-- **단계 3**: PyTorch 기반 실제 모델 적용 (진행 예정)
+- **단계 3**: PyTorch의 기본 모듈만 사용한 실제 모델 적용 (진행 예정)
+  - 고수준 완성형 모듈(`nn.Transformer`, `nn.MultiHeadAttention` 등) 사용하지 않기
+  - 기본 모듈(`nn.Linear`, `nn.Dropout`, `softmax` 등)만 사용하기
 
 ## 프로젝트 구조
 
@@ -27,6 +29,28 @@ pip install -r requirements.txt # 2. 의존성 설치
 uvicorn main:app --reload --port 8000 # 3. 서버 실행
 python test_generator.py # 4. 테스트 방법
 ```
+
+## Transformer 구현 깊이
+
+| 항목                                     | 사용 여부      | 이유                                                   |
+| ---------------------------------------- | -------------- | ------------------------------------------------------ |
+| ❌ nn.Transformer nn.MultiheadAttention  | 사용하지 않음  | 지나치게 얕음. 고수준 완성품이라 직접 만든 의미가 없음 |
+| ✅ nn.Module, nn.Linear, nn.Dropout      | 사용           | 기본적인 신경망 부품                                   |
+| ✅ torch.matmul, torch.transpose         | 사용           | 행렬 연산 (필수)                                       |
+| ✅ F.softmax, F.dropout                  | 사용           | 기본 연산 함수                                         |
+| ⚠️ NumPy나 순수 파이썬으로 처음부터 구현 | 하지 않아도 됨 | 지나치게 깊음. 비효율적이고 실용적이지 않음            |
+
+## Transformer 구현 순서
+
+| 단계 | 내용                                   | 목표                                          | 예상 소요 |
+| ---- | -------------------------------------- | --------------------------------------------- | --------- |
+| ✅ 1 | Scaled Dot-Product Attention 직접 구현 | 가장 핵심적인 Attention 메커니즘 이해 및 구현 | 가장 중요 |
+| 2    | Multi-Head Attention 구현              | 여러 Head를 다루는 방식 이해                  | 중요      |
+| 3    | DecoderLayer 구현                      | Attention + FFN + LayerNorm + Residual 연결   | 중        |
+| 4    | TransformerDecoder 구현                | 여러 개의 DecoderLayer를 쌓기                 | 중        |
+| 5    | 전체 모델 조립 + Positional Encoding   | Embedding + Positional Encoding + 출력층 연결 | 중        |
+| 6    | 학습 루프 + generate 함수 연결         | 모델 학습 및 텍스트 생성 동작 확인            | -         |
+| 7    | FastAPI 연결                           | 기존 웹 구조와 연결                           | -         |
 
 ## Development History
 
