@@ -2,11 +2,42 @@
 
 ## 현재 단계
 
-- **단계 1**: FastAPI 기본 구조 + Dummy Generator 완료
-- **단계 2**: 반복 호출 방식의 간이 생성기 완료 (규칙 기반)
-- **단계 3**: PyTorch의 기본 모듈만 사용한 실제 모델 적용 (진행 예정)
+- ✅ **단계 1**: FastAPI 기본 구조 + Dummy Generator 완료
+- ✅ **단계 2**: 반복 호출 방식의 간이 생성기 완료 (규칙 기반)
+- ✅ **단계 3**: PyTorch의 기본 모듈만 사용한 실제 모델 적용 (진행 예정)
   - 고수준 완성형 모듈(`nn.Transformer`, `nn.MultiHeadAttention` 등) 사용하지 않기
   - 기본 모듈(`nn.Linear`, `nn.Dropout`, `softmax` 등)만 사용하기
+- 🚧 지속 진행 작업: 학습 루프 구현 및 품질 개선
+
+## 현재 진행 상황 및 테스트 결과 (2026.06.19 기준)
+
+### FastAPI + 실제 모델 연결 완료
+
+- `generate.py`를 더미 로직에서 `TransformerLanguageModel` + `BPETokenizer` 기반으로 교체
+- `main.py`에 lifespan을 적용하여 모델 로딩 구조 개선
+- `/generate` 엔드포인트가 실제 모델을 호출하도록 연결 완료
+
+### curl 테스트 결과 예시
+
+```bash
+curl -X POST "http://localhost:8000/generate" \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "hello how are you", "max_length": 20}'
+```
+
+### 응답 결과 예시
+
+<img src="images/260619_curl_test_result.png" alt="260619_FastAPI curl 테스트 결과">
+
+```bash
+# 결과 JSON으로 표시
+{
+  "generated_text": "hello w you t new newer nowzhest nice meeheweayougoowm wo isyotodatet todaynewer hello how are you",
+  "prompt": "hello how are you"
+}
+```
+
+- ⚠️ 참고: 현재는 모델이 학습되지 않은 상태(random weights)이며, BPE vocabulary도 매우 제한적인 dummy corpus로 학습된 상태입니다. 따라서 생성 품질은 낮습니다. 학습 루프 적용 후 품질이 개선될 예정입니다.
 
 ## 프로젝트 구조
 
