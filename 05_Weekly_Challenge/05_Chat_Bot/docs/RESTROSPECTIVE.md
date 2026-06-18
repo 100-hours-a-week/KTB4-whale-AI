@@ -153,3 +153,44 @@
 - 레이어를 생성하는 시점과 실제 데이터를 넣는 시점을 명확히 구분해야 함
 - `in_features`는 입력 텐서의 마지막 차원 크기와 반드시 일치해야 하며, 이는 행렬 곱셈의 차원 조건 때문임
 - `d_model, d_model`처럼 동일한 값을 사용하는 것은 차원을 유지하면서도 입력 정보를 특정 목적(Q, K, V)에 맞게 재해석하기 위한 설계임을 이해함
+
+## 트러블 슈팅 6 - 폴더 구조에 따른 Import 에러 해결 (sys.path 수동 추가 방식)
+
+### 문제 상황
+
+- 프로젝트를 `src` 레이아웃으로 재구성한 후, `tests/` 폴더에서 모델 코드를 import하려고 했을 때 `ModuleNotFoundError: No module named 'src'` 에러가 발생함
+- 예시 에러
+
+  ```bash
+  from src.model.decoder_layer import DecoderLayer
+  ModuleNotFoundError: No module named 'src'
+  ```
+
+### 원인 분석
+
+- Python은 기본적으로 sys.path에 등록된 경로만 모듈을 검색함
+- `src` 폴더는 Python이 자동으로 인식하는 경로가 아니기 때문에, `from src.xxx import` 형태의 import가 실패함
+- `src`를 패키지 루트로 인식할 필요
+
+### 결정 및 대응
+
+- 가장 기본적인 방법으로 테스트 파일 상단에 프로젝트 루트 경로를 동적으로 추가하는 방식 적용
+- 코드 예시
+
+  ```python
+  import sys
+  import os
+
+  # 프로젝트 루트 경로 추가하여 임포트 에러 해결
+  __TEST_FOLDER_PATH__ = os.path.dirname(__file__)
+  joined_root_path = os.path.join(__TEST_FOLDER_PATH__, '..')
+  absoluted_joined_root_path = os.path.abspath(joined_root_path)
+  sys.path.append(absoluted_joined_root_path)
+  ```
+
+  - 이 코드를 통해 현재 테스트 파일의 위치를 기준으로 프로젝트 루트 경로를 계산한 후, sys.path에 추가하여 import가 가능하도록 함
+
+### 인사이트
+
+- sys.path.append 방식은 빠르게 문제를 해결할 수 있지만, 테스트 파일이 많아질수록 모든 파일에 동일한 코드를 중복해서 작성해야 한다는 단점이 있음
+- 장기적으로는 유지보수성과 확장성이 떨어지는 방식이라는 점을 인지함
