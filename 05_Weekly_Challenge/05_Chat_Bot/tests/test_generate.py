@@ -1,4 +1,4 @@
-from generator import generate
+from scripts.generate import generate
 
 print("=== Test 1 ===")
 print(generate("오늘 날씨가", max_new_tokens=25))

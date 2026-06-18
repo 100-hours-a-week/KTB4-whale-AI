@@ -1,5 +1,5 @@
 import torch
-from decoder_layer import DecoderLayer
+from src.model.decoder_layer import DecoderLayer
 
 def test_decoder_layer():
     print("=== DecoderLayer (Post-LN) 테스트 시작 ===\n")

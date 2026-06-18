@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from schemas import GenerateRequest, GenerateResponse
-from generator import generate as generate_text
+from scripts.generate import generate as generate_text
 
 app = FastAPI(title="한국어 챗봇 API (단계 1 - Dummy)")
 

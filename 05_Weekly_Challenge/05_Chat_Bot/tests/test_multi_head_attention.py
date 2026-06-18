@@ -1,5 +1,5 @@
 import torch
-from multi_head_attention import MultiHeadAttention
+from src.model.multi_head_attention import MultiHeadAttention
 
 def test_multi_head_attention():
     print("=== MultiHeadAttention 테스트 시작 ===\n")

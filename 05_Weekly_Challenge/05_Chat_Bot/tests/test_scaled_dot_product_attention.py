@@ -1,5 +1,5 @@
 import torch
-from scaled_dot_product_attention import ScaledDotProductAttention
+from src.model.scaled_dot_product_attention import ScaledDotProductAttention
 
 def test_scaled_dot_product_attention():
     print("=== ScaledDotProductAttention 테스트 시작 ===")

@@ -1,5 +1,5 @@
 import torch
-from transformer_model import TransformerLanguageModel
+from src.model.transformer_model import TransformerLanguageModel
 
 def test_transformer_language_model():
     print("=== TransformerLanguageModel 테스트 시작 ===\n")

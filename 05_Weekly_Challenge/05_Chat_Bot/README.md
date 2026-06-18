@@ -52,6 +52,20 @@ python test_generator.py # 4. 테스트 방법
 | 6    | 학습 루프 + generate 함수 연결         | 모델 학습 및 텍스트 생성 동작 확인            | -         |
 | 7    | FastAPI 연결                           | 기존 웹 구조와 연결                           | -         |
 
+## 전체 모델의 흐름
+
+```text
+입력 토큰 ID
+   ↓
+[Embedding]
+   ↓
+[Positional Encoding]
+   ↓
+[TransformerDecoder] (여러 층의 DecoderLayer)
+   ↓
+[Linear] → Vocab Size (다음 토큰 예측)
+```
+
 ## Development History
 
 | 단계   | 커밋 메시지                             | 커밋 링크                                                                                            | 비고                                        |

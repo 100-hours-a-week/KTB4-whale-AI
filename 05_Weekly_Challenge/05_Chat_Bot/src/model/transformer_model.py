@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from positional_encoding import PositionalEncoding
-from transformer_decoder import TransformerDecoder
-from decoder_layer import DecoderLayer
+from src.model.positional_encoding import PositionalEncoding
+from src.model.transformer_decoder import TransformerDecoder
+from src.model.decoder_layer import DecoderLayer
 
 class TransformerLanguageModel(nn.Module):
     def __init__(self, 

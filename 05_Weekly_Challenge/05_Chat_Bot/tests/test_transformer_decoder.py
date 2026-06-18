@@ -1,6 +1,6 @@
 import torch
-from decoder_layer import DecoderLayer
-from transformer_decoder import TransformerDecoder
+from src.model.decoder_layer import DecoderLayer
+from src.model.transformer_decoder import TransformerDecoder
 
 # DecoderLayer 생성
 decoder_layer = DecoderLayer(
