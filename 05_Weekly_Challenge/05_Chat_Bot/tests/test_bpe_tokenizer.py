@@ -28,7 +28,10 @@ def test_bpe_tokenizer():
     print("\n========== 테스트 3: train() ==========")
     corpus = [
         "low lower lowest",
-        "new newer newest"
+        "new newer newest",
+        "low low low",
+        "new new new",
+        "hello world hello world"
     ]
 
     tokenizer = BPETokenizer(vocab_size=30)
