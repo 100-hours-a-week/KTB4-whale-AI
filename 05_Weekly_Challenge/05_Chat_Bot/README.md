@@ -80,8 +80,8 @@ python test_generator.py # 4. 테스트 방법
 | ✅ 3 | DecoderLayer 구현                      | Attention + FFN + LayerNorm + Residual 연결   | 중        |
 | ✅ 4 | TransformerDecoder 구현                | 여러 개의 DecoderLayer를 쌓기                 | 중        |
 | ✅ 5 | 전체 모델 조립 + Positional Encoding   | Embedding + Positional Encoding + 출력층 연결 | 중        |
-| 6    | 학습 루프 + generate 함수 연결         | 모델 학습 및 텍스트 생성 동작 확인            | -         |
-| 7    | FastAPI 연결                           | 기존 웹 구조와 연결                           | -         |
+| ✅ 6 | 학습 루프 + generate 함수 연결         | 모델 학습 및 텍스트 생성 동작 확인            | -         |
+| ✅ 7 | FastAPI 연결                           | 기존 웹 구조와 연결                           | -         |
 
 ## 전체 모델의 흐름
 
