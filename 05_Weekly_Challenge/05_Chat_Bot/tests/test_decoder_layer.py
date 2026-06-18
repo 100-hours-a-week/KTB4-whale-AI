@@ -1,18 +1,5 @@
-import sys
-import os
-
-# 프로젝트 루트 경로 추가하여 임포트 에러 해결
-__TEST_FOLDER_PATH__ = os.path.dirname(__file__) # 현재 파일(test_bpe_tokenizer.py)의 폴더 경로를 반환
-joined_root_path = os.path.join(__TEST_FOLDER_PATH__, '..') # tests 폴더의 상위 폴더로 이동
-absoluted_joined_root_path = os.path.abspath(joined_root_path) # 상대 경로를 절대 경로로 변환
-sys.path.append(absoluted_joined_root_path) # 임포트 경로 리스트(sys.path)에 프로젝트 루트 경로를 추가(append)
-
-print("test folder path: ", __TEST_FOLDER_PATH__)
-print("joined root path: ", joined_root_path)
-print("absoluted joined root path: ", absoluted_joined_root_path)
-
 import torch
-from src.model.decoder_layer import DecoderLayer
+from model.decoder_layer import DecoderLayer
 
 def test_decoder_layer():
     print("=== DecoderLayer (Post-LN) 테스트 시작 ===\n")

@@ -194,3 +194,62 @@
 
 - sys.path.append 방식은 빠르게 문제를 해결할 수 있지만, 테스트 파일이 많아질수록 모든 파일에 동일한 코드를 중복해서 작성해야 한다는 단점이 있음
 - 장기적으로는 유지보수성과 확장성이 떨어지는 방식이라는 점을 인지함
+
+## 트러블 슈팅 7 - 확장 가능한 Import 해결을 위한 pyproject.toml 도입
+
+### 문제 상황
+
+- 프로젝트를 `src` 레이아웃으로 재구성하면서 `tests/` 폴더에서 모델 코드를 import할 때 `ModuleNotFoundError: No module named 'src'` 에러가 발생함
+- 초기에는 테스트 파일 상단에 `sys.path.append`를 통해 프로젝트 루트 경로를 수동으로 추가하는 방식으로 문제를 해결했으나, 이 방식은 파일이 많아질수록 모든 테스트 파일에 동일한 코드를 반복적으로 작성해야 한다는 **유지보수 문제**를 안고 있었음
+- 또한 `scripts/generate.py`처럼 별도 폴더에 있던 실행 스크립트에서 모델을 import할 때도 동일한 문제가 발생하여, 구조적으로 일관된 해결책이 필요하다고 판단
+
+### 원인 분석
+
+- `src` 레이아웃을 사용하면서 `pip install -e .`을 적용하지 않은 상태에서는 Python이 `src` 폴더를 패키지 루트로 인식하지 못함
+- `sys.path.append` 방식은 단기적인 해결책일 뿐, 프로젝트 규모가 커질수록 기술 부채가 될 가능성이 높음
+- 내부 파일들(`decoder_layer.py`, `transformer_model.py` 등)에서도 `from src.model...` 형태의 import가 남아 있어, `pip install -e .` 적용 후에도 충돌이 발생
+- 실행 스크립트(`generate.py`, `main.py`)를 별도로 두고 import하려는 시도 또한 구조적으로 일관성을 해치는 요인이 되었음
+
+### 결정 및 대응
+
+- 장기적인 유지보수성과 확장성을 확보하기 위해 `pyproject.toml`을 도입하고, `pip install -e .`를 통해 프로젝트를 개발 모드로 설치하는 방식으로 전환
+- `pyproject.toml` 소스 코드
+
+  ```toml
+  [build-system]
+  requires = ["setuptools>=61.0"]
+  build-backend = "setuptools.build_meta"
+
+  [project]
+  name = "korean-chatbot"
+  version = "0.1.0"
+  description = "From-scratch Transformer for Korean Chatbot"
+  authors = [{name = "Whale.lim(임경락)"}]
+  readme = "README.md"
+  requires-python = ">=3.10"
+
+  [tool.setuptools.packages.find]
+  where = ["src"]
+  ```
+
+  - `where = ["src"]` 설정을 통해 src 폴더를 패키지 루트로 지정하고, editable install을 적용
+    - editable install: 소스 코드를 복사하지 않고 원본 위치를 그대로 참조하여 설치하는 방식, 코드 수정 시 별도의 재설치 없이 바로 반영 가능하여 개발 중인 상황에서 자주 사용되어 "개발 모드"라고 표현
+  - 기존에 `scripts/` 폴더에 있던 `generate.py`, `main.py` 등을 `src/` 하위로 이동시켜 구조를 단순화
+  - 모든 파일에서 `from src.model...`, `from src.tokenizer...` 형태의 import를 `from model...`, `from tokenizer...`으로 정리
+
+- pyproject.toml 동작 원리에 대해 학습 병행
+  - `pip install -e .`를 실행하면 아래와 같은 내부 동작이 실행
+    1. setuptools가 `pyproject.toml`을 읽는다.
+       - setuptools: 파이썬에서 패키지를 만드록 배포할 때 사용하는 빌드 도구(Build Backend) 중 하나.
+    2. [tool.setuptools.packages.find] where = ["src"] 설정을 보고, src 폴더를 패키지의 루트로 인식한다.
+    3. 가상환경의 `.venv/bin/lib/python3.14/site-packages` 폴더 안에 `korean-chatbot.egg-link` 파일(경우에 따라 .pth 파일도)이 생성된다.
+    4. 이 `.egg-link` 파일에는 프로젝트 루트 경로가 기록되어 있으며, 이를 통해 가상환경에게 해당 경로를 sys.path에 추가하라고 알려준다.
+    5. 결과적으로 src 아래에 있는 model, tokenizer 폴더를 최상위 패키지처럼 인식하게 되어, `from model.xxx import ...`, `from tokenizer.xxx import ...` 형태의 깔끔한 import가 가능해진다.
+
+### 인사이트
+
+- `sys.path.append` 방식은 빠르게 문제를 해결할 수는 있지만, 파일 수가 증가할수록 유지보수 비용이 기하급수적으로 늘어난다는 것을 경험
+- `pyproject.toml` + `pip install -e .` 방식은 Python 패키지 시스템을 제대로 활용하는 방법으로, 장기적인 관점에서 훨씬 안정적이고 확장성이 뛰어남
+- `src` 레이아웃을 도입할 경우, 단순히 폴더 구조만 바꾸는 것이 아니라 import 경로 전체를 일관되게 정리해야 한다는 점을 깨달음
+- 실행 스크립트(`generate.py`, `main.py` 등)도 `src/` 하위에 두는 것이 구조적으로 더 일관되고 관리하기 쉬움
+- "만약 변경해야 될 파일이 1,000개라면"이라는 가정으로 생각했을 때, 초기 단계부터 패키지 구조와 import 전략을 신경 쓰는 것이 나중에 대규모 리팩토링을 방지하는 가장 효과적인 방법이라는 것을 확인
