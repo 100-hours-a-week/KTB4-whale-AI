@@ -2,6 +2,17 @@ from collections import defaultdict, Counter
 import re
 
 class BPETokenizer:
+    """
+    BPE Tokenizer 구현체
+
+    Known Limitation (2026.06.19 기준):
+        - train() 메서드의 vocabulary 품질이 아직 충분하지 않음.
+          전체 단어가 통째로 토큰으로 남거나, 일관성 없는 서브워드 분해가 발생할 수 있음.
+        - 이로 인해 encode() 결과가 기대보다 짧거나, 의미 있는 subword 단위로 분해되지 않을 수 있음.
+        - 현재는 decode()는 정상 동작하지만, 생성 품질 저하의 주요 원인이 됨.
+        - 개선 방향: merges_needed 계산 방식 재검토 + vocabulary 구축 로직 정교화
+          (RESTROSPECTIVE.md 트러블슈팅 9, 10 참조)
+    """
     def __init__(self, vocab_size: int):
         """
         vocab_size: 최종적으로 만들 어휘 사전의 크기
@@ -43,6 +54,11 @@ class BPETokenizer:
         for word in word_freq:
             initial_tokens.update(word.split())
 
+        # TODO: BPE 학습 로직 개선 필요 (2026.06.19)
+        # 현재 merges_needed를 len(initial_tokens) 기준으로 계산하고 있으나,
+        # 이는 BPE의 본질(정보 이론 기반 압축, MDL 최소화)과 잘 맞지 않을 수 있음.
+        # 또한 최종 vocabulary 구축 방식이 ad-hoc하여 품질이 낮음.
+        # → 향후 고정된 병합 횟수 또는 vocabulary 성장률 기반 제어로 변경 검토 필요.
         merges_needed = max(0, self.vocab_size - len(initial_tokens))
 
         # 3. 병합 반복 수행
@@ -131,6 +147,11 @@ class BPETokenizer:
     def encode(self, text: str) -> list[int]:
         """
         텍스트를 BPE 방식으로 토큰화하여 token ID 리스트로 반환
+
+        Known Limitation:
+            - OOV 토큰을 -1로 처리하고 있음. 이는 모델 입력 시 문제가 될 수 있음.
+            - <unk>, <bos>, <eos> 등 특수 토큰에 대한 명시적 처리가 아직 없음.
+            - vocabulary 품질이 낮을 경우, 긴 시퀀스가 짧게 압축되는 현상이 발생할 수 있음.
         """
         
         # 1. Pre-tokenization (단어 단위로 나누고 문제 + </w>로 분리)

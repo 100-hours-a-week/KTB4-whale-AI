@@ -7,9 +7,11 @@ def generate(
     stop_sequences: Optional[list[str]] = None
 ) -> str:
     """
-    단계 2: 반복 호출로 문장을 완성하는 간이 생성기.
-    
-    TODO: 나중에 이 함수 내부를 진짜 모델 기반 생성 로직으로 교체할 예정입니다.
+    단계 2: 반복 호출 방식의 간이 생성기 (Dummy)
+
+    TODO: (2026.06.19)
+        - 이 함수 내부를 TransformerLanguageModel.generate() 기반으로 완전히 교체해야 함.
+        - 현재는 규칙 기반 더미 로직이므로, 실제 모델 연결 후 삭제 또는 대폭 수정 예정.
     """
     if stop_sequences is None:
         stop_sequences = []
