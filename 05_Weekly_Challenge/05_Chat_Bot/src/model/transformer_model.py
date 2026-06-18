@@ -36,6 +36,8 @@ class TransformerLanguageModel(nn.Module):
     def forward(self, input_ids, mask=None):
         """
         input_ids: (batch_size, seq_len)
+
+        TODO: Pre-LN vs Post-LN 구조 변경 검토 (DecoderLayer 내부에 Post-LN 주석 있음)
         """
         # Embedding
         x = self.embedding(input_ids) * (self.d_model ** 0.5)  # 원본 논문에서 사용한 scaling 방법 (선택)
@@ -54,13 +56,20 @@ class TransformerLanguageModel(nn.Module):
     @torch.no_grad()
     def generate(self, input_ids, max_new_tokens=50, temperature=1.0, top_k=None):
         """
-        텍스트 생성 함수
+        텍스트 생성 함수 (Autoregressive Decoding)
 
         Args:
             input_ids: (batch_size, seq_len) 형태의 입력 토큰
             max_new_tokens: 생성할 최대 토큰 수
             temperature: 샘플링 시 다양성 조절 (1.0 = 기본, 낮을수록 보수적)
             top_k: 상위 k개 토큰 중에서만 샘플링 (None이면 전체 사용)
+
+        Known Limitation (2026.06.19 기준):
+            - EOS 토큰 기반 early stopping이 구현되어 있지 않음.
+            - 따라서 max_new_tokens만큼 무조건 생성함.
+            - BOS 토큰을 자동으로 붙여주지 않음 (호출하는 쪽에서 처리 필요).
+            - 현재는 가중치가 학습되지 않은 상태(random init)에서는 의미 있는 생성이 어려움.
+            - temperature / top_k는 지원되지만, repetition_penalty 등 고급 샘플링 기법은 미구현.
         """
         self.eval()
 
