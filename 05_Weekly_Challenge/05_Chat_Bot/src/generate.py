@@ -127,6 +127,20 @@ def generate(
     # TODO: stop_sequences에 해당하는 문자열이 생성되면 잘라내는 후처리 로직 추가 필요
     # 현재는 model.generate() 단계에서 제어하지 못하므로 후처리로 처리해야 함.
 
+    # TODO: 학습 필요 - 비동기 모델 추론 최적화
+    #
+    # 현재 generate()는 동기 방식으로 모델을 호출하고 있음.
+    # FastAPI는 비동기 프레임워크이므로, 다량의 동시 요청 시
+    # 이벤트 루프가 블로킹되어 성능 저하가 발생할 수 있음.
+    #
+    # 고려할 수 있는 최적화 방향:
+    # 1. fastapi.concurrency.run_in_threadpool 사용
+    # 2. torch.jit / torch.compile 적용
+    # 3. vLLM, TensorRT 등 별도 추론 엔진 도입
+    # 4. 요청 큐 + Background Task 구조
+    #
+    # 지금은 모델 규모가 작아서 큰 문제가 없지만,
+    # 추후 서비스화할 때 반드시 학습해야 할 주제.
     return generated_text
 
 
