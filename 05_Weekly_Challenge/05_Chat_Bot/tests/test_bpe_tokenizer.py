@@ -64,6 +64,21 @@ def test_bpe_tokenizer():
 
     print("\n✅ 테스트 4 통과: encode() 동작\n")
 
+    # ======= 테스트 5: encode + decode =======
+    print("\n========== 테스트 5: encode + decode ==========")
+
+    tokenizer = BPETokenizer(vocab_size=30)
+    tokenizer.train(["low lower lowest", "new newer newest", "hello world"])
+
+    test_texts = ["low", "lower", "hello", "world"]
+
+    for text in test_texts:
+        encoded = tokenizer.encode(text)
+        decoded = tokenizer.decode(encoded)
+        print(f"원본: {text:10} → 인코딩: {encoded} → 디코딩: {decoded}")
+
+    print("\n✅ 테스트 5 통과: encode + decode 동작\n")
+    
     print("=== 모든 테스트 완료 ===")
 
 if __name__ == "__main__":

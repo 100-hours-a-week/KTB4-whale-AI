@@ -17,7 +17,14 @@ class BPETokenizer:
         BPE 학습 메인 함수
         - corpus: 학습에 사용할 텍스트 리스트
         """
-
+        
+        # TODO: 현재 train()은 BPE의 기본적인 동작은 수행하지만,
+        #       최종 vocabulary의 품질이 아직 만족스럽지 않음.
+        #       특히 token_to_id에 전체 단어(low</w>, hello</w> 등)가 많이 남아 있고,
+        #       일관된 서브워드 단위로 vocabulary가 구성되지 않는 문제가 있음.
+        #       나중에 vocabulary 구축 로직을 더 체계적으로 개선할 필요가 있음.
+        #       (예: 모든 병합 단계에서 등장한 토큰을 기록하거나,
+        #        더 정교한 vocabulary selection 전략 적용)
         # 1. 초기 word_freq 구성
         word_freq = {}
         for sentence in corpus:             
@@ -28,6 +35,10 @@ class BPETokenizer:
                 
         # 2. 목표 병합 횟수 계산 (대략적인 추정)
         # word_freq_size에 도달하기 위해 대략 몇 번 병합해야 하는지 계산
+        # TODO: 현재 merges_needed 계산 방식(len(word_freq) 기반)은
+        #       BPE 학습의 본질과 잘 맞지 않을 수 있음.
+        #       더 나은 방식(예: 고정된 병합 횟수 또는 vocabulary 성장률 기반)으로
+        #       개선하는 것을 고려해야 함.
         initial_tokens = set()
         for word in word_freq:
             initial_tokens.update(word.split())
@@ -55,6 +66,12 @@ class BPETokenizer:
         self.vocab = word_freq
 
         # 4. 개선된 vocabulary 구축
+        # TODO: 현재 vocabulary 구축 방식은 ad-hoc(임시방편)임.
+        #       word_freq의 현재 상태 + merge_rules에서 토큰을 수집하고 있는데,
+        #       이는 BPE 학습 과정에서 만들어진 모든 유의미한 서브워드를
+        #       체계적으로 수집하는 방법이 아님.
+        #       나중에 더 나은 vocabulary selection 전략을 적용해야 함.
+        #       (예: 모든 병합 단계별로 등장한 토큰 기록, frequency 기반 필터링 등)
         all_tokens = set()
 
         # 5. 현재 word_freq에 있는 모든 서브워드 수집
@@ -154,5 +171,24 @@ class BPETokenizer:
         return token_ids
 
     def decode(self, token_ids: list[int]) -> str:
-        """token ID를 텍스트로 복원"""
-        pass
+        """
+        token ID 리스트를 받아서 원래 텍스트로 복원
+        """
+        tokens = []
+        for token_id in token_ids:
+            if token_id in self.id_to_token:
+                tokens.append(self.id_to_token[token_id])
+            else:
+                # 등록되지 않은 ID는 <unk>로 처리 (필요시 다른 방식으로 변경 가능)
+                tokens.append("<unk>")
+
+        # 토큰들을 이어붙임
+        text = ''.join(tokens)
+
+        # </w>를 공백으로 치환하여 문장 형태로 복원
+        text = text.replace("</w>", " ")
+
+        # 앞뒤 공백 제거
+        text = text.strip()
+
+        return text
