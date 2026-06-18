@@ -53,6 +53,17 @@ def test_bpe_tokenizer():
 
     print("\n✅ 테스트 3 통과: train() 동작\n")
 
+    # ======= 테스트 4: encode() =======
+    print("\n========== 테스트 4: encode() ==========")
+    tokenizer = BPETokenizer(vocab_size=30)
+    tokenizer.train(["low lower lowest", "new newer newest"])
+
+    print(tokenizer.encode("low"))
+    print(tokenizer.encode("lower"))
+    print(tokenizer.encode("hello"))
+
+    print("\n✅ 테스트 4 통과: encode() 동작\n")
+
     print("=== 모든 테스트 완료 ===")
 
 if __name__ == "__main__":

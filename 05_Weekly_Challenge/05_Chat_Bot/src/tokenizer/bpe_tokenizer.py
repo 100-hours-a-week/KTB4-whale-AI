@@ -112,8 +112,46 @@ class BPETokenizer:
         return new_vocab
 
     def encode(self, text: str) -> list[int]:
-        """텍스트를 token ID로 변환"""
-        pass
+        """
+        텍스트를 BPE 방식으로 토큰화하여 token ID 리스트로 반환
+        """
+        
+        # 1. Pre-tokenization (단어 단위로 나누고 문제 + </w>로 분리)
+        words = text.split()
+        tokens = []
+        for word in words:
+            # 예: "low" → ['l', 'o', 'w', '</w>']
+            word_tokens = list(word) + ['</w>']
+            tokens.extend(word_tokens)
+
+        print(f"[encode] 초기 tokens: {tokens}") # 디버그: 초기 상태
+
+        # 2. 학습된 merge_rules 순서대로 병합 적용
+        for pair in self.merge_rules:
+            new_tokens = []
+            i = 0
+            while i < len(tokens):
+                # 현재 위치에서 pair와 일치하는지 확인
+                if i < len(tokens) - 1 and (tokens[i], tokens[i + 1]) == pair:
+                    # 병합
+                    merged = ''.join(pair)
+                    new_tokens.append(merged)
+                    i += 2
+                else:
+                    new_tokens.append(tokens[i])
+                    i += 1
+            tokens = new_tokens
+
+        # 3. token_to_id를 사용해 ID로 변환
+        token_ids = []
+        for token in tokens:
+            if token in self.token_to_id:
+                token_ids.append(self.token_to_id[token])
+            else:
+                token_ids.append(-1)   # OOV 표시 (나중에 <unk> 처리 가능)
+
+        print(f"[encode] 최종 token_ids: {token_ids}")
+        return token_ids
 
     def decode(self, token_ids: list[int]) -> str:
         """token ID를 텍스트로 복원"""
