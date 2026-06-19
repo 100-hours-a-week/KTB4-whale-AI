@@ -15,4 +15,4 @@
 
 ## 회고록
 
-- [4주차 회고록 바로가기](./RETROSPECTIVE.md)
+- [5주차 회고록 바로가기](./RETROSPECTIVE.md)
