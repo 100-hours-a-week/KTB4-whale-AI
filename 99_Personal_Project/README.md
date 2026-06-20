@@ -1,4 +1,4 @@
-# 05 Chatbot - 단계 1 (Dummy)
+# 05 Chatbot - 단계 3
 
 ## 현재 단계
 
