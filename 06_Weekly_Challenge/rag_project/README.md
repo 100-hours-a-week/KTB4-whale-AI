@@ -54,3 +54,10 @@
 | Input (입력) | Chunk 리스트(`list[str]`) + 벡터 배열(`numpy.ndarray`) |
 | Output (출력) | 검색 가능한 저장소 객체 — chunk와 벡터를 1:1로 매핑하여 보관 |
 | 책임(Responsibility) | chunk와 벡터를 짝지어 보관하고, 인덱스(index)로 원래 텍스트를 다시 찾을 수 있게 하는 것까지만. 유사도 계산/검색 로직(Retrieval)은 다음 단계의 책임 |
+
+**Retrieval 단계 입출력 명세**
+| 항목 | 정의 |
+| --- | --- |
+| Input (입력) | `query_vector` (shape `(384,)`) + `store` (`InMemoryVectorStore` 인스턴스) + `k` (정수) |
+| Output (출력) | `(chunk 텍스트, 유사도 점수)` 튜플의 리스트, 길이 `k`, 점수 내림차순 정렬 |
+| 책임(Responsibility) | 유사도 계산 + 순위화 + Top-k 추출 + 텍스트 복원까지만. Prompt 조립이나 생성은 다음 단계의 책임 |

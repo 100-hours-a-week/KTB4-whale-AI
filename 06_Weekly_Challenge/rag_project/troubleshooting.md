@@ -373,3 +373,61 @@ pip install -e .
 
 - 지금까지의 네 가지 방법(#1, #4, #5, #6)은 모두 "Python에게 경로를 그때그때 알려주는" 동일한 계열의 해결책이었고, 각자 적용 범위(파일/세션/도구/에디터)만 달랐다는 것을 이 마지막 단계에 이르러서야 전체적으로 조망할 수 있었다. **문제를 해결하는 범위를 점차 넓혀가다 보면, 결국 "그때그때 알려주기"가 아니라 "원천적으로 등록하기"라는 다른 범주의 해결책이 필요해진다**는 것을 직접 체험했다.
 - `src/` 레이아웃과 `pyproject.toml` 기반의 editable install은 NumPy, Pandas를 포함한 다수의 Python 라이브러리가 실제로 채택하는 표준 프로젝트 구조라는 것을 알게 되었다. 처음에 겪었던 단순한 import 에러가, 결국 "Python 패키지를 어떻게 구조화하고 배포하는가"라는 더 큰 주제로 이어졌다는 점에서, 작은 문제 하나가 더 넓은 생태계 이해로 확장될 수 있다는 것을 경험했다.
+
+---
+
+## #8. Fixed-size Chunking으로 인한 검색 품질 저하 — 핵심 정보가 상위 k개에서 누락됨
+
+> 이 항목은 #1~#7과 달리 코드 에러가 아니라, **Retrieval 결과의 품질(quality) 문제**를 다룬다.
+
+### 문제 상황
+
+`"What is the default API port for NimbusFlow?"`라는 질문으로 Retrieval을 실행했을 때, 실제 정답("포트 8842")이 담긴 chunk가 top-3 검색 결과에 전혀 포함되지 않았다. 대신 설치 경로, 버전 정보처럼 질문과 표면적으로만 연관된 chunk들이 상위에 노출되었다.
+
+### 원인 분석
+
+디버깅 스크립트로 전체 16개 chunk의 유사도 점수를 직접 확인한 결과, "8842"가 포함된 chunk(인덱스 6)는 실제로 **16개 중 3위(score=0.6546)**를 기록했다. 그런데 1위(chunk 3, score=0.7273)와 2위(chunk 1, score=0.7245)가 근소한 차이로 더 높은 점수를 받아, k=3 검색에서 정작 가장 관련성이 높아야 할 chunk가 경계에 걸려 누락되는 경우가 발생했다.
+
+내용을 직접 살펴보면, "8842"가 포함된 chunk는 다음과 같이 구성되어 있었다.
+
+```
+...to alternate between local execution and cloud execution depending on a metric
+called the Drift Score. If the Drift Score exceeds 0.73, NimbusFlow automatically
+switches execution to the cloud worker pool.
+
+## 4. API Usage
+
+NimbusFlow exposes a REST API on port `8842` by default.
+
+### 4.1 Authentication
+...
+```
+
+`chunk_size=300, chunk_overlap=50`으로 고정 길이 분할(fixed-size chunking)을 하다 보니, **"## 4. API Usage" 섹션의 핵심 문장(포트 8842)이, 전혀 다른 주제(Drift Score, 인증 토큰)와 한 chunk 안에 함께 섞여 들어갔다.** 이로 인해 해당 chunk의 임베딩 벡터가 "API 포트"라는 단일 주제를 강하게 대표하지 못하고, 여러 주제가 섞인 모호한 벡터가 되어 유사도 점수가 희석된 것으로 판단된다.
+
+반면 1, 2위로 검색된 chunk들은 "NimbusFlow", "default"라는 단어를 반복적으로 포함하고 있어, 질문에 포함된 "default"라는 표면적 단어와 더 강하게 일치한 것으로 보인다.
+
+근본 원인: **Fixed-size chunking은 문서의 의미 단위(섹션, 문단)를 고려하지 않고 글자 수로만 자르기 때문에, 서로 무관한 내용이 한 chunk에 뒤섞이고, 그 결과 핵심 정보를 담은 chunk의 임베딩이 약화될 수 있다.**
+
+### 재현 방법
+
+1. 여러 개의 독립된 주제(섹션)가 포함된 문서를 준비한다.
+2. 섹션 경계와 무관하게 고정된 글자 수(`chunk_size`)로 chunking한다.
+3. 어떤 섹션의 핵심 문장이 chunk의 일부에만, 그것도 다른 주제와 함께 섞여 들어가도록 경계가 형성되는 경우가 생긴다.
+4. 그 섹션에 대한 질문으로 검색하면, 핵심 정보가 담긴 chunk가 표면적 단어 일치도가 높은 다른 chunk에 밀려 상위 k위 안에 들지 못하는 현상이 재현될 수 있다.
+
+### 해결 과정
+
+(이 항목은 원인 진단까지 완료한 상태이며, 실제 개선은 Step B(Query Phase) 완성 이후 별도로 진행하기로 결정했다.)
+
+- (주의 사항) 이 문제는 코드 버그가 아니라 **Chunking 전략의 설계 한계**이므로, Retrieval 알고리즘(`cosine_similarity`, `retrieve_top_k`) 자체를 수정해서 해결할 수 있는 문제가 아니다. 근본적인 해결은 Chunking 단계로 거슬러 올라가야 한다.
+- (개선 방향 후보)
+  - k값을 늘려 누락 위험을 줄이는 방법 (단, distractor chunk가 함께 포함될 위험과 트레이드오프 존재)
+  - Section-based chunking으로 전환하여, 섹션 경계를 chunk 경계와 일치시키는 방법
+  - `chunk_size`를 줄여 한 chunk에 여러 주제가 섞일 가능성을 낮추는 방법
+
+### 배운 점
+
+- Retrieval 코드가 모든 테스트(8개)를 통과했다는 사실과, 실제 도메인 질문에서 정답을 찾아내는 것은 **서로 다른 차원의 검증**이라는 것을 직접 체감했다. 단위 테스트는 "알고리즘이 설계대로 동작하는가"를 보장하지만, "그 설계가 실제로 좋은 결과를 만드는가"는 별도로 점검해야 한다.
+- Chunking 전략(표 28에서 미리 검토했던 fixed-size vs section-based의 trade-off)이 단순한 설계 선택이 아니라, **실제 검색 품질에 직접적인 영향을 미치는 핵심 변수**라는 것을 추상적인 이론이 아니라 실제 데이터로 확인했다.
+- 디버깅 스크립트(`debug_retrieval.py`)를 별도로 작성해 "어떤 chunk가 몇 위인지"를 직접 눈으로 확인한 것이, 추측에 의존하지 않고 근본 원인을 정확히 짚는 데 핵심적이었다 — 막연히 "임베딩이 이상한가보다"라고 넘기지 않고, 실제 순위와 점수를 출력해 검증한 것이 정확한 진단으로 이어졌다.
