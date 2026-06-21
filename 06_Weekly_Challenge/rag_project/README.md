@@ -61,3 +61,12 @@
 | Input (입력) | `query_vector` (shape `(384,)`) + `store` (`InMemoryVectorStore` 인스턴스) + `k` (정수) |
 | Output (출력) | `(chunk 텍스트, 유사도 점수)` 튜플의 리스트, 길이 `k`, 점수 내림차순 정렬 |
 | 책임(Responsibility) | 유사도 계산 + 순위화 + Top-k 추출 + 텍스트 복원까지만. Prompt 조립이나 생성은 다음 단계의 책임 |
+
+**Prompt Augmentation 단계 입출력 명세**
+| 항목 | 정의 |
+| --- | --- |
+| Input (입력) | 사용자 질문(string) + Retrieval 결과(`list[tuple[str, float]]`) |
+| Output (출력) | LLM에 전달할 완성된 prompt(string) |
+| 책임(Responsibility) | 검색된 chunk들을 질문과 함께 LLM이 이해할 수 있는 하나의 텍스트로 조립하는 것까지만. LLM 호출(Generation)은 다음 단계의 책임 |
+
+- 중요한 설계 포인트: "모르면 모른다고 답하라"고 명시적으로 지시하기 (환각 억제)
