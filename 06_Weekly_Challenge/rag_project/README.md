@@ -1,5 +1,7 @@
 # RAG Architecture Project
 
+## 1. RAG 구현
+
 **Document Loading 단계 입출력 명세**
 | 항목 | 정의 |
 | --- | --- |
@@ -85,6 +87,8 @@
 
 - 중요한 설계 포인트: "모르면 모른다고 답하라"고 명시적으로 지시하기 (환각 억제)
 
+## 2. FastAPI Wrapping
+
 **FastAPI 앱 설계 명세**
 | 항목 | 정의 |
 | --- | --- |
@@ -92,3 +96,20 @@
 | 요청 Body | `{"question": str, "k": int (선택, 기본값 3)}` |
 | 응답 Body | `{"answer": str, "retrieved_chunks": list[{"text": str, "score": float}]}` |
 | Indexing 시점 | FastAPI의 lifespan 이벤트로 서버 시작 시 1회 |
+
+## 3. RAGAS 평가
+
+**Level 0 Task Unit — 최소 Faithfulness 평가 스크립트 명세**
+| 항목 | 정의 |
+| --- | --- |
+| **Task Unit 이름** | Level 0: RAGAS 없는 최소 Faithfulness 평가 |
+| **목표** | RAGAS 라이브러리 없이, 기존 TextGenerator만 사용하여 생성된 답변의 **Faithfulness(충실도)**를 가장 기본적인 형태로 측정 |
+| **평가 지표** | Faithfulness (생성된 답변이 검색된 context에 근거하는가) |
+| **평가 로직 형태** | LLM에게 각 주장을 Yes/No + 간단한 이유로 판단하게 함 (가장 단순한 형태) |
+| **입력 (Input)** | RAG 파이프라인의 출력 결과 (question, answer, retrieved_chunks) |
+| **출력 (Output)** | 각 주장에 대한 판단 결과 + 전체 Faithfulness 점수 (콘솔 출력) |
+| **책임 (Responsibility)** | 평가 로직만 담당. RAG 파이프라인을 호출하거나 재구현하지 않음 |
+| **사용 모델** | 기존 TextGenerator (Gemma 4 E2B-it) 재사용 |
+| **의존성** | 추가 의존성 없음 |
+| **스크립트 위치** | debugs/evaluate_faithfulness.py |
+| **평가 데이터** | debug_retrieval.py에서 이미 검증된 4개 질문 재사용 |

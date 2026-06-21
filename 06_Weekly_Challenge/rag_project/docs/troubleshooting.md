@@ -658,3 +658,85 @@ data_path = Path(__file__).resolve().parent.parent.parent / "data" / "nimbusflow
 ### 배운 점
 
 - 테스트 작성 여부를 "테스트가 가능한가"만으로 판단하지 않고, "테스트 비용 대비 얻는 검증 가치가 충분한가"로 판단하는 기준을 Generation 모듈(트러블슈팅, `test_generator.py` 생략 결정)에 이어 FastAPI 계층에도 동일하게 적용했다. 같은 원리가 다른 계층(모듈 → API)에도 일관되게 적용될 수 있다는 것을 확인했다.
+
+#15. scope="class" fixture를 instance method로 정의할 때 발생하는 PytestRemovedIn10Warning
+
+## #15. `scope="class"` fixture를 instance method로 정의할 때 발생하는 `PytestRemovedIn10Warning`
+
+#### 1. 문제 상황
+
+`tests/test_evaluate_faithfulness.py`에서 `scope="class"` fixture를 다음과 같이 일반 인스턴스 메서드 형태로 작성했다.
+
+```python
+@pytest.fixture(scope="class")
+def sample_data(self):
+    ...
+```
+
+테스트를 실행하자 다음과 같은 경고가 발생했다:
+
+```bash
+textPytestRemovedIn10Warning: Class-scoped fixture defined as instance method is deprecated.
+Instance attributes set in this fixture will NOT be visible to test methods,
+as each test gets a new instance while the fixture runs only once per class.
+Use @classmethod decorator and set attributes on cls instead.
+```
+
+처음에는 경고 메시지만 보고 대략적으로 @classmethod를 붙이면 될 것이라고 생각했으나, 왜 이런 경고가 발생하는지에 대한 근본적인 이해가 부족하다는 것을 느꼈다.
+
+#### 2. 원인 분석
+
+2.1 경고 메시지 해석
+경고 메시지의 핵심 내용은 다음과 같았다:
+
+Class-scoped fixture를 instance method로 정의하는 것은 더 이상 권장되지 않는다(deprecated).
+fixture 내부에서 self에 값을 저장해도, 실제 테스트 메서드에서는 해당 값을 볼 수 없다.
+그 이유는 fixture는 클래스당 한 번만 실행되지만, 각 테스트는 새로운 인스턴스를 받기 때문이다.
+
+이 문장을 통해 단순한 문법 문제가 아니라, pytest의 fixture 생명주기와 관련된 구조적인 문제라는 것을 인지했다.
+2.2 scope="class"의 의미와 self 사용 시 발생하는 문제
+scope="class"는 해당 클래스 내 모든 테스트가 fixture를 한 번만 실행하고 공유하겠다는 의미를 담고 있다.
+여기서 핵심적인 의문이 생겼다:
+“fixture는 클래스당 한 번만 실행되는데, pytest는 왜 각 테스트마다 새로운 인스턴스를 생성하는가?
+그렇다면 fixture 안에서 self.xxx = 값으로 저장한 것은, 실제 테스트 실행 시점의 self와 다른 객체가 되는 것 아닌가?”
+이 질문을 해결하기 위해 self와 cls의 차이를 정리했다.
+
+일반 메서드에서 self는 메서드를 호출한 인스턴스를 가리킨다.
+@classmethod에서 cls는 클래스 자체를 가리킨다.
+
+scope="class" fixture의 목적은 클래스 전체에서 데이터를 공유하는 것이었는데, self를 사용하면 fixture 실행 시점과 테스트 실행 시점의 인스턴스가 달라서 값이 공유되지 않는 구조였다. 이것이 경고가 발생하는 근본 원인이었다.
+2.3 @classmethod를 선택한 이유
+위 문제를 해결하기 위해 @classmethod 데코레이터를 적용했다.
+@classmethod를 사용하면 메서드의 첫 번째 인자가 인스턴스가 아닌 클래스 자체로 전달되므로, cls.xxx = 값 형태로 클래스 레벨에 속성을 저장할 수 있다. 이는 scope="class"의 목적과 정확히 일치했다.
+또한 pytest 공식 문서에서도 scope="class" fixture를 정의할 때는 @classmethod 사용을 권장하고 있었다.
+
+#### 3. 해결 과정
+
+최종적으로 fixture를 아래와 같이 수정했다:
+
+```python
+Python@pytest.fixture(scope="class")
+@classmethod
+def sample_data(cls):
+    ...
+```
+
+수정 후 PytestRemovedIn10Warning은 사라졌으며, 모든 테스트가 정상적으로 통과했다.
+
+#### 4. 배운 점
+
+이번 경험을 통해 단순히 경고 메시지를 보고 대응하는 것이 아니라, 경고가 발생하는 근본 원리를 파고드는 것의 중요성을 다시 확인했다.
+특히 다음과 같은 개념을 더 명확하게 정리할 수 있었다:
+
+scope="class" fixture는 클래스당 한 번 실행되지만, 각 테스트는 별도의 인스턴스를 받기 때문에 self로는 값을 공유할 수 없다.
+@classmethod를 통해 cls를 사용하면 클래스 레벨에 값을 저장할 수 있으며, 이는 scope="class"의 목적과 잘 맞는다.
+데코레이터(@)는 함수를 감싸는 고차함수의 한 형태이며, classmethod는 메서드의 첫 번째 인자를 변경하는 역할을 한다.
+
+추가로 깊게 공부하고 싶은 주제
+이번 이슈를 해결하면서 자연스럽게 생긴 추가 질문들은 다음과 같다. 당장 Level 0 진행에 필수적인 내용은 아니었기 때문에, 나중에 필요할 때 별도로 학습하기로 했다.
+| 주제 | 주요 포인트 | 학습 우선순위 |
+| --- | --- | --- |
+| 고차함수와 클로저 | 데코레이터의 내부 동작 원리 | 중 |
+| Python Descriptor 프로토콜 | `__get__`, `__set__`, Property | 하 |
+| pytest 고급 사용법 | fixture 실행 순서, Dependency Injection | 중 |
+| Java AOP와 Python 데코레이터 | 개념 비교 | 하 |
