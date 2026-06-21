@@ -18,71 +18,76 @@ from model.vector_store import InMemoryVectorStore
 from model.retriever import cosine_similarity
 
 document = load_document("data/nimbusflow_manual.md")
-question = "What is the default API port for NimbusFlow?"
+# (질문, 정답을 찾기 위한 키워드) 쌍으로 직접 지정 — 자동 추출 대신 명확성을 우선한다
+questions = [
+    ("What is the default API port for NimbusFlow?", "8842"),
+    ("What is the internal codename of NimbusFlow during development?", "Driftwood"),
+    ("What is the default checkpoint_interval_sec value?", "checkpoint_interval_sec"),
+    ("What does error code NF-227 mean?", "NF-227"),
+]
 embedder = TextEmbedder()
 
-print("########## [전략 1] Fixed-size chunking ##########\n")
+for question, target_keyword in questions:
+    print(f"\n\n{'=' * 70}")
+    print(f"질문: {question}")
+    print(f"{'=' * 70}")
 
-chunks = chunk_fixed_size(document, chunk_size=300, chunk_overlap=50)
+    print("\n########## [전략 1] Fixed-size chunking ##########\n")
 
-# 1. "8842"를 포함한 chunk(들)의 인덱스를 모두 찾는다
-target_indices = [i for i, c in enumerate(chunks) if "8842" in c]
-print(f"[점검 1] '8842'를 포함한 chunk 인덱스: {target_indices}")
-for i in target_indices:
-    print(f"  - chunk[{i}]: {chunks[i]!r}")
+    chunks = chunk_fixed_size(document, chunk_size=300, chunk_overlap=50)
 
-print()
+    # 1. 정답 키워드를 포함한 chunk(들)의 인덱스를 모두 찾는다
+    target_indices = [i for i, c in enumerate(chunks) if target_keyword.lower() in c.lower()]
+    print(f"[점검 1] '{target_keyword}' 키워드를 포함한 chunk 인덱스: {target_indices}")
 
-# 2. 전체 임베딩 및 저장
-vectors = embedder.encode(chunks)
-store = InMemoryVectorStore()
-store.add(chunks, vectors)
+    print()
 
-# 3. 질문에 대해 모든 chunk의 유사도 점수와 순위를 계산
-query_vector = embedder.encode([question])[0]
+    # 2. 전체 임베딩 및 저장
+    vectors = embedder.encode(chunks)
+    store = InMemoryVectorStore()
+    store.add(chunks, vectors)
 
-all_scores = []
-for i in range(len(store)):
-    score = cosine_similarity(query_vector, store.vectors[i])
-    all_scores.append((i, score))
+    # 3. 질문에 대해 모든 chunk의 유사도 점수와 순위를 계산
+    query_vector = embedder.encode([question])[0]
 
-all_scores.sort(key=lambda pair: pair[1], reverse=True)
+    all_scores = []
+    for i in range(len(store)):
+        score = cosine_similarity(query_vector, store.vectors[i])
+        all_scores.append((i, score))
 
-print(f"[점검 2] 질문: {question}")
-print("[점검 2] 전체 chunk 순위 (인덱스, 점수):")
-for rank, (index, score) in enumerate(all_scores, start=1):
-    marker = " <== TARGET (8842 포함)" if index in target_indices else ""
-    print(f"  Rank {rank}: chunk[{index}] score={score:.4f}{marker}")
+    all_scores.sort(key=lambda pair: pair[1], reverse=True)
 
-print("\n\n########## [전략 2] Section-based chunking ##########\n")
+    print(f"[점검 2] 전체 chunk 순위 (인덱스, 점수) - 상위 5개만 표시:")
+    for rank, (index, score) in enumerate(all_scores[:5], start=1):
+        marker = " <== TARGET" if index in target_indices else ""
+        print(f"  Rank {rank}: chunk[{index}] score={score:.4f}{marker}")
 
-chunks = chunk_by_section(document, chunk_size=300, chunk_overlap=50)
+    print("\n########## [전략 2] Section-based chunking ##########\n")
 
-# 1. "8842"를 포함한 chunk(들)의 인덱스를 모두 찾는다
-target_indices = [i for i, c in enumerate(chunks) if "8842" in c]
-print(f"[점검 1] '8842'를 포함한 chunk 인덱스: {target_indices}")
-for i in target_indices:
-    print(f"  - chunk[{i}]: {chunks[i]!r}")
+    chunks = chunk_by_section(document, chunk_size=300, chunk_overlap=50)
 
-print()
+    # 1. 정답 관련 키워드를 포함한 chunk(들)의 인덱스를 모두 찾는다
+    target_indices = [i for i, c in enumerate(chunks) if target_keyword.lower() in c.lower()]
+    print(f"[점검 1] '{target_keyword}' 키워드를 포함한 chunk 인덱스: {target_indices}")
 
-# 2. 전체 임베딩 및 저장
-vectors = embedder.encode(chunks)
-store = InMemoryVectorStore()
-store.add(chunks, vectors)
+    print()
 
-# 3. 질문에 대해 모든 chunk의 유사도 점수와 순위를 계산
-query_vector = embedder.encode([question])[0]
+    # 2. 전체 임베딩 및 저장
+    vectors = embedder.encode(chunks)
+    store = InMemoryVectorStore()
+    store.add(chunks, vectors)
 
-all_scores = []
-for i in range(len(store)):
-    score = cosine_similarity(query_vector, store.vectors[i])
-    all_scores.append((i, score))
+    # 3. 질문에 대해 모든 chunk의 유사도 점수와 순위를 계산
+    query_vector = embedder.encode([question])[0]
 
-all_scores.sort(key=lambda pair: pair[1], reverse=True)
+    all_scores = []
+    for i in range(len(store)):
+        score = cosine_similarity(query_vector, store.vectors[i])
+        all_scores.append((i, score))
 
-print(f"[점검 2] 질문: {question}")
-print("[점검 2] 전체 chunk 순위 (인덱스, 점수):")
-for rank, (index, score) in enumerate(all_scores, start=1):
-    marker = " <== TARGET (8842 포함)" if index in target_indices else ""
-    print(f"  Rank {rank}: chunk[{index}] score={score:.4f}{marker}")
+    all_scores.sort(key=lambda pair: pair[1], reverse=True)
+
+    print(f"[점검 2] 전체 chunk 순위 (인덱스, 점수) - 상위 5개만 표시:")
+    for rank, (index, score) in enumerate(all_scores[:5], start=1):
+        marker = " <== TARGET" if index in target_indices else ""
+        print(f"  Rank {rank}: chunk[{index}] score={score:.4f}{marker}")
