@@ -84,3 +84,11 @@
 | 책임(Responsibility) | 검색된 chunk들을 질문과 함께 LLM이 이해할 수 있는 하나의 텍스트로 조립하는 것까지만. LLM 호출(Generation)은 다음 단계의 책임 |
 
 - 중요한 설계 포인트: "모르면 모른다고 답하라"고 명시적으로 지시하기 (환각 억제)
+
+**FastAPI 앱 설계 명세**
+| 항목 | 정의 |
+| --- | --- |
+| 엔드포인트 | `POST /query` |
+| 요청 Body | `{"question": str, "k": int (선택, 기본값 3)}` |
+| 응답 Body | `{"answer": str, "retrieved_chunks": list[{"text": str, "score": float}]}` |
+| Indexing 시점 | FastAPI의 lifespan 이벤트로 서버 시작 시 1회 |
