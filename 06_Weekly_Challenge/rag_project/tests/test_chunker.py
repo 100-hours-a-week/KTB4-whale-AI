@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from model.chunker import chunk_fixed_size  # noqa: E402
+from model.chunker import chunk_by_section, chunk_fixed_size  # noqa: E402
 from model.document_loader import load_document  # noqa: E402
 
 
@@ -88,3 +88,74 @@ class TestChunkFixedSize:
         assert "nimbusflow" in combined_lower
         assert "nf-227" in combined_lower
         assert "project driftwood" in combined_lower
+
+
+class TestChunkBySection:
+    """chunk_by_section() 함수에 대한 테스트 그룹"""
+
+    def test_short_sections_become_single_chunks(self):
+        """섹션 미초과 시 단일 chunk: chunk_size보다 짧은 섹션은 그대로 1개 chunk가 되어야 한다."""
+        text = "## Section A\nshort content A\n## Section B\nshort content B"
+        chunks = chunk_by_section(text, chunk_size=300, chunk_overlap=50)
+
+        assert len(chunks) == 2
+        assert "Section A" in chunks[0]
+        assert "Section B" in chunks[1]
+
+    def test_section_boundaries_are_not_mixed(self):
+        """섹션 경계 보존 검증: 서로 다른 섹션의 내용이 같은 chunk에 섞이지 않아야 한다."""
+        text = "## Topic X\ncontent about X\n## Topic Y\ncontent about Y"
+        chunks = chunk_by_section(text, chunk_size=300, chunk_overlap=50)
+
+        # "Topic X" 섹션 내용을 담은 chunk에는 "Topic Y"가 없어야 하고, 그 반대도 마찬가지여야 한다
+        for chunk in chunks:
+            if "Topic X" in chunk:
+                assert "Topic Y" not in chunk
+            if "Topic Y" in chunk:
+                assert "Topic X" not in chunk
+
+    def test_long_section_is_split_internally_without_crossing_boundary(self):
+        """
+        섹션 초과 시 내부 재분할 검증: chunk_size를 초과하는 섹션은 여러 chunk로 나뉘지만,
+        그 어떤 chunk도 다른 섹션의 내용을 포함하지 않아야 한다.
+        """
+        long_content = "word " * 100  # 500자 — chunk_size(50)를 초과하도록 구성
+        text = f"## Long Section\n{long_content}\n## Short Section\nshort content"
+
+        chunks = chunk_by_section(text, chunk_size=50, chunk_overlap=10)
+
+        # Long Section은 여러 chunk로 나뉘어야 한다 (1개로는 부족함)
+        long_section_chunks = [c for c in chunks if "Long Section" in c or ("word" in c and "Short Section" not in c)]
+        assert len(long_section_chunks) > 1
+
+        # Short Section 내용을 포함한 chunk에는 "word"(Long Section의 내용)가 섞이지 않아야 한다
+        for chunk in chunks:
+            if "Short Section" in chunk:
+                assert "word" not in chunk
+
+    def test_empty_text_raises_value_error(self):
+        """예외 케이스: 빈 텍스트를 넣으면 ValueError가 발생해야 한다."""
+        with pytest.raises(ValueError):
+            chunk_by_section("", chunk_size=300, chunk_overlap=50)
+
+    def test_section_chunking_separates_unrelated_topics_in_real_manual(self):
+        """
+        실제 데이터 통합 검증 (트러블슈팅 #8 회귀 테스트):
+        "8842"(API Usage 섹션)가 "Drift Score"(Configuration 섹션)와
+        서로 다른 chunk에 분리되어 있어야 한다 — fixed-size chunking에서 섞였던 문제가
+        section-based chunking에서는 해결되었는지 확인한다.
+        """
+        real_data_path = (
+            Path(__file__).resolve().parent.parent / "data" / "nimbusflow_manual.md"
+        )
+        document = load_document(str(real_data_path))
+
+        chunks = chunk_by_section(document, chunk_size=300, chunk_overlap=50)
+
+        # "8842"가 포함된 chunk를 찾는다
+        chunks_with_port = [c for c in chunks if "8842" in c]
+        assert len(chunks_with_port) > 0
+
+        # "8842"가 포함된 chunk에는 "Drift Score"(다른 섹션의 내용)가 섞이지 않아야 한다
+        for chunk in chunks_with_port:
+            assert "Drift Score" not in chunk

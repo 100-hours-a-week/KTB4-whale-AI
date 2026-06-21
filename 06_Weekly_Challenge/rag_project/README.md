@@ -15,6 +15,20 @@
 | 핵심 파라미터 | `chunk_size` (chunk당 문자 수), `chunk_overlap` (인접 chunk 간 겹치는 문자 수) |
 | 책임(Responsibility) | 텍스트를 정해진 길이로 자르는 것까지만. Embedding은 다음 단계의 책임 |
 
+**Section-based Chunking 단계 입출력 명세**
+| 항목 | 정의 |
+| --- | --- |
+| Input (입력) | Raw text — Document Loading 단계의 출력 |
+| Output (출력) | Chunk 리스트 — `list[str]` (기존 `chunk_fixed_size`와 동일한 반환 타입) |
+| 핵심 전략 | `##` 헤더로 섹션 분리 → 섹션이 `chunk_size`보다 길면 그 섹션 내부에서만 fixed-size로 재분할 |
+
+- 하이브리드 방식을 적용하여 "섹션 경계는 절대 넘지 않되, 섹션이 너무 길면 그 안에서 추가로 자른다."
+- 이렇게 하면 트러블슈팅 #8에서 발견한 문제(서로 다른 주제가 한 chunk에 섞이는 것)을 원천적으로 방지하면서, 섹션이 비정상적으로 길어서 임베딩 품질이 떨어지는 경우 대비할 수 있다.
+- 구현 순서:
+  1. 정규표현식으로 `## ` 패턴을 찾아 텍스트를 섹션 단위로 분리
+  2. 각 섹션 `chunk_size` 이하면 그대로 1개 chunk
+  3. `chunk_size`를 초과하면, 기존 `chunk_fixed_size()`를 그 섹션 텍스트에 재사용하여 내부적으로 잘게 나눔
+
 **Embedding 단계 입출력 명세**
 | 항목 | 정의 |
 | --- | --- |
