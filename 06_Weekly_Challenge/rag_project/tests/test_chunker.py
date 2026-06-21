@@ -9,13 +9,9 @@ Test for Step A-2: Chunking (src/model/chunker.py)
 5. 실제 데이터 통합 검증: nimbusflow_manual.md가 정상적으로 분할되는가
 """
 
-import sys
 from pathlib import Path
 
 import pytest
-
-SRC_DIR = Path(__file__).resolve().parent.parent / "src"
-sys.path.append(str(SRC_DIR))
 
 from model.chunker import chunk_fixed_size  # noqa: E402
 from model.document_loader import load_document  # noqa: E402

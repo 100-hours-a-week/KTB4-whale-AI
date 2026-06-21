@@ -11,14 +11,8 @@ Test for Step A-3: Embedding (src/model/embedder.py)
       최초 실행 시 모델 다운로드 시간이 걸리고, 이후에는 캐시를 사용한다.
 """
 
-import sys
-from pathlib import Path
-
 import numpy as np
 import pytest
-
-SRC_DIR = Path(__file__).resolve().parent.parent / "src"
-sys.path.append(str(SRC_DIR))
 
 from model.embedder import TextEmbedder  # noqa: E402
 

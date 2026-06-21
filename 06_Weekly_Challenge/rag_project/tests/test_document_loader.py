@@ -8,12 +8,8 @@ Test for Step A-1: Document Loading (src/model/document_loader.py)
 4. 내용 검증: 로드된 텍스트가 실제 파일 내용과 정확히 일치하는가
 """
 
-import sys
 from pathlib import Path
-
 import pytest
-SRC_MODEL_DIR = Path(__file__).resolve().parent.parent / "src"
-sys.path.append(str(SRC_MODEL_DIR))
 
 from model.document_loader import load_document  # noqa: E402
 

@@ -12,14 +12,8 @@ Test for Step A-4: Storage (src/model/vector_store.py)
       인덱스 정합성 검증이 쉬워진다.
 """
 
-import sys
-from pathlib import Path
-
 import numpy as np
 import pytest
-
-SRC_DIR = Path(__file__).resolve().parent.parent / "src"
-sys.path.append(str(SRC_DIR))
 
 from model.vector_store import InMemoryVectorStore  # noqa: E402
 
