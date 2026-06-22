@@ -107,7 +107,7 @@
 | **Level 2** | RAGAS 기본 연동 | RAGAS 라이브러리 도입 및 연동 | 직접 구현의 유지보수 비용 | 표준화된 평가 + 편의성 확보 | 중상 |
 | **Level 3** | RAGAS 고도화 + 운영 | 전체 지표 통합 + 자동화 | 일회성 평가에 머무름 | 실 서비스 운영 수준의 평가 체계 구축 | 상 |
 
-**Level 0: Faithfulness**
+**Level 0: Faithfulness 명세**
 | 항목 | 정의 |
 | --- | --- |
 | **Task Unit 이름** | Level 0: RAGAS 없는 최소 Faithfulness 평가 |
@@ -117,12 +117,12 @@
 | **입력 (Input)** | RAG 파이프라인의 출력 결과 (question, answer, retrieved_chunks) |
 | **출력 (Output)** | 각 주장에 대한 판단 결과 + 전체 Faithfulness 점수 (콘솔 출력) |
 | **책임 (Responsibility)** | 평가 로직만 담당. RAG 파이프라인을 호출하거나 재구현하지 않음 |
-| **사용 모델** | 기존 TextGenerator (Gemma 4 E2B-it) 재사용 |
+| **LLM 사용** | 사용하지 않음 |
 | **의존성** | 추가 의존성 없음 |
 | **스크립트 위치** | debugs/evaluate_faithfulness.py |
 | **평가 데이터** | debug_retrieval.py에서 이미 검증된 4개 질문 재사용 |
 
-**Level 0: Context Precision**
+**Level 0: Context Precision 명세**
 | 항목 | 내용 |
 | --- | --- |
 | **목표** | 검색된 context 중 질문과 관련 있는 context의 비율을 가장 단순한 방식으로 계산 |
@@ -130,11 +130,11 @@
 | **Input** | `question` (str), `retrieved_chunks` (list[str]) |
 | **Output** | `context_precision_score` (float, 0.0 ~ 1.0), 각 chunk에 대한 관련성 판단 결과 |
 | **책임** | 검색 품질 평가 담당 |
-| **LLM 사용** | 사용하지 않음 (가장 단순한 형태 유지) |
+| **LLM 사용** | 사용하지 않음 |
 | **스크립트 위치** | `debugs/evaluate_context_precision.py` |
 | **평가 데이터** | 기존에 사용하던 질문 세트 재사용 |
 
-**Level 0: Answer Relevancy**
+**Level 0: Answer Relevancy 명세**
 | 항목 | 내용 |
 | --- | --- |
 | **지표** | **Answer Relevancy** |
@@ -143,5 +143,19 @@
 | **Input** | `question` (str), `answer` (str) |
 | **Output** | `answer_relevancy_score` (float) + 각 판단 근거 |
 | **책임** | 생성된 답변과 질문 간의 관련성 평가 담당 |
+| **LLM 사용** | 사용하지 않음 |
 | **Threshold** | 0.3 |
 | **스크립트 위치** | `debugs/evaluate_answer_relevancy.py` |
+
+**Level 0: Context Recall 명세**
+| 항목 | 내용 |
+| --- | --- |
+| **지표** | **Context Recall** |
+| **평가 대상** | 검색 품질 (정답에 필요한 정보가 검색됐는가?) |
+| **구현 방식** | 가장 단순한 키워드 기반 (Ground Truth 필요) |
+| **Input** | `question`, `retrieved_chunks`, `ground_truth` (핵심 정보 목록) |
+| **Output** | `context_recall_score` (float), 각 핵심 정보의 포함 여부 |
+| **책임** | 정답에 필요한 정보가 검색됐는지를 담당 |
+| **LLM 사용** | 사용하지 않음 |
+| **스크립트 위치** | `debugs/evaluate_context_recall.py` |
+| **평가 데이터** | 기존 질문에 Ground Truth(핵심 정보)를 추가하여 사용 |
