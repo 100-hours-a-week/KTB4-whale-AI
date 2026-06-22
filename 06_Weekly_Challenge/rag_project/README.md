@@ -117,7 +117,7 @@
 | **입력 (Input)** | RAG 파이프라인의 출력 결과 (question, answer, retrieved_chunks) |
 | **출력 (Output)** | 각 주장에 대한 판단 결과 + 전체 Faithfulness 점수 (콘솔 출력) |
 | **책임 (Responsibility)** | 평가 로직만 담당. RAG 파이프라인을 호출하거나 재구현하지 않음 |
-| **LLM 사용** | 사용하지 않음 |
+| **사용 모델** | 기존 TextGenerator (Gemma 4 E2B-it) 재사용 |
 | **의존성** | 추가 의존성 없음 |
 | **스크립트 위치** | debugs/evaluate_faithfulness.py |
 | **평가 데이터** | debug_retrieval.py에서 이미 검증된 4개 질문 재사용 |
