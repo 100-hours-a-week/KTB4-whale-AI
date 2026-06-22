@@ -659,8 +659,6 @@ data_path = Path(__file__).resolve().parent.parent.parent / "data" / "nimbusflow
 
 - 테스트 작성 여부를 "테스트가 가능한가"만으로 판단하지 않고, "테스트 비용 대비 얻는 검증 가치가 충분한가"로 판단하는 기준을 Generation 모듈(트러블슈팅, `test_generator.py` 생략 결정)에 이어 FastAPI 계층에도 동일하게 적용했다. 같은 원리가 다른 계층(모듈 → API)에도 일관되게 적용될 수 있다는 것을 확인했다.
 
-#15. scope="class" fixture를 instance method로 정의할 때 발생하는 PytestRemovedIn10Warning
-
 ## #15. `scope="class"` fixture를 instance method로 정의할 때 발생하는 `PytestRemovedIn10Warning`
 
 #### 1. 문제 상황
