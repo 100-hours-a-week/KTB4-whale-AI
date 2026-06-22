@@ -5,12 +5,6 @@ Root from Expansion 원칙에 따라, RAG 파이프라인과의 통합 없이
 평가 로직만 독립적으로 구현한다.
 """
 
-import sys
-from pathlib import Path
-
-# src 경로 추가
-sys.path.append(str(Path(__file__).resolve().parent.parent / "src"))
-
 from model.generator import TextGenerator
 
 

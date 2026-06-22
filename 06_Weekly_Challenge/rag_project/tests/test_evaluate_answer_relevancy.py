@@ -1,71 +1,66 @@
 """
-Test for Level 2: evaluate_answer_relevancy() in debugs/evaluate_answer_relevancy.py
+Test for Level 1: evaluate_answer_relevancy() in debugs/evaluate_answer_relevancy.py
 
 검증 항목:
-1. 정상 케이스: Answer Relevancy 점수가 올바르게 계산되는가
-2. 관련성 판단 검증: is_relevant 값이 올바르게 설정되는가
-3. 빈 답변 입력 시 처리
-4. Threshold에 따른 결과 변화
-5. 점수 범위 검증 (0.0 ~ 1.0)
+1. 빈 답변 입력 시 처리 (LLM 호출 없이 즉시 0.0 반환되는가)
+2. 질문에 직접 대응하는 답변은 관련 있음으로 판단하는가
+3. 질문과 무관한 답변은 관련 없음으로 판단하는가
+4. 점수가 0.0 또는 1.0 중 하나로만 반환되는가 (이진 판단 설계 검증)
 """
 
 import pytest
 
 from debugs.evaluate_answer_relevancy import evaluate_answer_relevancy  # noqa: E402
+from model.generator import TextGenerator  # noqa: E402
+
+
+@pytest.fixture(scope="module")
+def generator():
+    """모듈 전체에서 TextGenerator를 한 번만 로딩하여 재사용한다."""
+    return TextGenerator()
 
 
 class TestEvaluateAnswerRelevancy:
-    """evaluate_answer_relevancy() 함수에 대한 테스트 그룹"""
+    """evaluate_answer_relevancy() 함수에 대한 테스트 그룹 (Level 1: LLM-as-a-Judge)"""
 
-    @pytest.fixture
-    def sample_data(self):
-        """테스트용 샘플 데이터"""
-        return {
-            "question": "What is the default API port for NimbusFlow?",
-            "answer": "The default API port for NimbusFlow is 8842."
-        }
-
-    def test_returns_score_in_valid_range(self, sample_data):
-        """정상 케이스: 점수가 0.0 ~ 1.0 사이로 반환되는가"""
-        result = evaluate_answer_relevancy(
-            question=sample_data["question"],
-            answer=sample_data["answer"],
-            threshold=0.3
-        )
-        assert 0.0 <= result["answer_relevancy_score"] <= 1.0
-
-    def test_is_relevant_field_exists(self, sample_data):
-        """is_relevant 필드가 올바르게 포함되는가"""
-        result = evaluate_answer_relevancy(
-            question=sample_data["question"],
-            answer=sample_data["answer"],
-            threshold=0.3
-        )
-        assert "is_relevant" in result
-        assert isinstance(result["is_relevant"], bool)
-
-    def test_empty_answer_returns_zero_score(self):
-        """빈 답변을 넣으면 점수가 0.0이 나와야 함"""
+    def test_empty_answer_returns_zero_score_without_llm_call(self):
+        """예외 케이스: 빈 답변을 넣으면 LLM 호출 없이 즉시 0.0을 반환해야 한다."""
         result = evaluate_answer_relevancy(
             question="What is the default API port?",
             answer="",
-            threshold=0.3
         )
         assert result["answer_relevancy_score"] == 0.0
         assert result["is_relevant"] is False
 
-    def test_threshold_affects_result(self, sample_data):
-        """Threshold 값에 따라 is_relevant 결과가 달라질 수 있는가"""
-        result_low = evaluate_answer_relevancy(
-            question=sample_data["question"],
-            answer=sample_data["answer"],
-            threshold=0.1
-        )
-        result_high = evaluate_answer_relevancy(
-            question=sample_data["question"],
-            answer=sample_data["answer"],
-            threshold=0.9
-        )
+    def test_score_is_binary(self, generator):
+        """설계 검증: 점수가 0.0 또는 1.0 중 하나로만 반환되어야 한다 (이진 판단)."""
+        question = "What is the default API port for NimbusFlow?"
+        answer = "The default API port for NimbusFlow is 8842."
 
-        # threshold가 낮을수록 관련 있다고 판단될 가능성이 높거나 같아야 함
-        assert result_low["is_relevant"] >= result_high["is_relevant"]
+        result = evaluate_answer_relevancy(question, answer)
+
+        assert result["answer_relevancy_score"] in (0.0, 1.0)
+
+    def test_answer_directly_addressing_question_is_relevant(self, generator):
+        """
+        의미적 검증: 질문에 직접 대응하는 답변은 관련 있다고 판단되어야 한다.
+        """
+        question = "What is the default API port for NimbusFlow?"
+        answer = "The default API port for NimbusFlow is 8842."
+
+        result = evaluate_answer_relevancy(question, answer)
+
+        assert result["is_relevant"] is True
+        assert result["answer_relevancy_score"] == 1.0
+
+    def test_answer_unrelated_to_question_is_not_relevant(self, generator):
+        """
+        의미적 검증: 질문과 전혀 무관한 답변은 관련 없다고 판단되어야 한다.
+        """
+        question = "What is the default API port for NimbusFlow?"
+        answer = "The weather today is sunny with a light breeze."
+
+        result = evaluate_answer_relevancy(question, answer)
+
+        assert result["is_relevant"] is False
+        assert result["answer_relevancy_score"] == 0.0

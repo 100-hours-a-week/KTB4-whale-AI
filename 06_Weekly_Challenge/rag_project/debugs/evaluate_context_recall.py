@@ -1,71 +1,70 @@
 """
-Level 0: Context Recall (가장 단순한 키워드 기반)
+Level 1: Context Recall (LLM-as-a-Judge 기반)
 
 목표:
-- 정답에 필요한 핵심 정보(Ground Truth)가 검색된 context에 얼마나 포함되어 있는지 측정
+- 정답에 필요한 핵심 정보(Ground Truth) 각각이, 검색된 context로부터
+  추론 가능한지를 LLM이 의미적으로 판단하여 Context Recall 점수를 계산
 
-구현 방식:
-- Ground Truth를 문장 형태의 리스트로 정의
-- 검색된 context를 하나로 합쳐서 키워드 기반으로 검색
-- 각 Ground Truth 문장이 포함되어 있는지 판단
+Level 0과의 차이:
+- Level 0(키워드 기반)은 Ground Truth 문장의 단어가 context에 그대로
+  등장하는지만 보았다. Ground Truth가 한국어 문장으로 작성된 경우,
+  영어 context와는 단어 자체가 겹치지 않아 항상 매칭에 실패하는 구조적
+  한계가 있었다.
+- Level 1은 LLM에게 "이 Ground Truth 정보가 context로부터 추론 가능한가"를
+  언어 표현과 무관하게 의미적으로 판단하게 한다.
 """
 
-import re
-from typing import List, Dict, Any
-
-
-def preprocess_text(text: str) -> List[str]:
-    """텍스트를 소문자화하고 단어 리스트로 변환"""
-    text = text.lower()
-    text = re.sub(r'[^a-z\s]', ' ', text)
-    return text.split()
+from model.generator import TextGenerator
 
 
 def evaluate_context_recall(
     question: str,
-    retrieved_chunks: List[str],
-    ground_truth: List[str],
-    threshold: float = 0.3
-) -> Dict[str, Any]:
+    retrieved_chunks: list[str],
+    ground_truth: list[str],
+) -> dict:
     """
-    Context Recall을 가장 단순한 키워드 기반으로 평가한다.
+    Context Recall을 LLM-as-a-Judge 방식으로 평가한다.
+
+    각 Ground Truth 항목에 대해 "이 정보가 검색된 context로부터 추론
+    가능한가"를 LLM이 Yes/No로 판단하고, 추론 가능하다고 판단된 항목의
+    비율을 점수로 계산한다.
 
     Args:
         question: 사용자 질문
         retrieved_chunks: 검색된 context 리스트
         ground_truth: 정답에 필요한 핵심 정보 (문장 리스트)
-        threshold: 포함 여부를 판단할 키워드 겹침 비율 기준
 
     Returns:
         {
-            "context_recall_score": float,
-            "judgments": List[Dict],   # 각 ground truth 항목에 대한 판단 결과
-            "threshold": float
+            "context_recall_score": float,  # 0.0 ~ 1.0
+            "judgments": list[dict],        # 각 ground truth 항목에 대한 판단 결과
         }
     """
     if not ground_truth:
         return {
             "context_recall_score": 0.0,
             "judgments": [],
-            "threshold": threshold
         }
 
-    # 검색된 context를 하나로 합침
-    combined_context = " ".join(retrieved_chunks)
-    context_words = set(preprocess_text(combined_context))
+    combined_context = "\n\n".join(retrieved_chunks)
+    generator = TextGenerator()
 
     judgments = []
     matched_count = 0
 
     for i, gt_sentence in enumerate(ground_truth):
-        gt_words = preprocess_text(gt_sentence)
+        prompt = f"""You are an evaluator that judges whether a piece of information can be inferred from a given context.
 
-        if not gt_words:
-            is_matched = False
-        else:
-            overlap_count = sum(1 for word in gt_words if word in context_words)
-            overlap_ratio = overlap_count / len(gt_words)
-            is_matched = overlap_ratio >= threshold
+Context:
+{combined_context}
+
+Information to check: {gt_sentence}
+
+Can the above information be inferred from the context, regardless of the language it is written in?
+Answer with exactly one word: Yes or No.
+"""
+        response = generator.generate(prompt, max_new_tokens=10)
+        is_matched = response.strip().lower().startswith("yes")
 
         if is_matched:
             matched_count += 1
@@ -73,8 +72,8 @@ def evaluate_context_recall(
         judgments.append({
             "ground_truth_index": i,
             "ground_truth": gt_sentence,
-            "overlap_ratio": round(overlap_ratio, 4) if gt_words else 0.0,
-            "is_matched": is_matched
+            "is_matched": is_matched,
+            "raw_response": response.strip(),
         })
 
     context_recall_score = matched_count / len(ground_truth)
@@ -82,29 +81,27 @@ def evaluate_context_recall(
     return {
         "context_recall_score": round(context_recall_score, 4),
         "judgments": judgments,
-        "threshold": threshold
     }
 
 
 if __name__ == "__main__":
-    # Level 0 테스트용 예시
+    # Level 1 테스트용 예시 (Level 0과 동일한 데이터로 비교 가능하게 유지)
     question = "What is the default API port for NimbusFlow?"
     retrieved_chunks = [
         "NimbusFlow exposes a REST API on port 8842 by default.",
-        "The product was developed under the codename Project Driftwood."
+        "The product was developed under the codename Project Driftwood.",
     ]
     ground_truth = [
         "API 포트는 8842이다",
-        "NimbusFlow는 데이터 파이프라인 엔진이다"
+        "NimbusFlow는 데이터 파이프라인 엔진이다",
     ]
 
-    result = evaluate_context_recall(question, retrieved_chunks, ground_truth, threshold=0.3)
+    result = evaluate_context_recall(question, retrieved_chunks, ground_truth)
 
     print("=" * 60)
     print(f"[Context Recall Score] {result['context_recall_score']}")
-    print(f"[Threshold] {result['threshold']}")
     print("=" * 60)
 
     for j in result["judgments"]:
         status = "포함됨" if j["is_matched"] else "미포함"
-        print(f"[{status}] {j['ground_truth']} (overlap={j['overlap_ratio']})")
+        print(f"[{status}] {j['ground_truth']} (LLM 응답: {j['raw_response']!r})")
