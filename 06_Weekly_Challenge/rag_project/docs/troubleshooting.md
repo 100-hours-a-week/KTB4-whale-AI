@@ -661,7 +661,7 @@ data_path = Path(__file__).resolve().parent.parent.parent / "data" / "nimbusflow
 
 ## #15. `scope="class"` fixture를 instance method로 정의할 때 발생하는 `PytestRemovedIn10Warning`
 
-#### 1. 문제 상황
+### 1. 문제 상황
 
 `tests/test_evaluate_faithfulness.py`에서 `scope="class"` fixture를 다음과 같이 일반 인스턴스 메서드 형태로 작성했다.
 
@@ -682,7 +682,7 @@ Use @classmethod decorator and set attributes on cls instead.
 
 처음에는 경고 메시지만 보고 대략적으로 @classmethod를 붙이면 될 것이라고 생각했으나, 왜 이런 경고가 발생하는지에 대한 근본적인 이해가 부족하다는 것을 느꼈다.
 
-#### 2. 원인 분석
+### 2. 원인 분석
 
 2.1 경고 메시지 해석
 경고 메시지의 핵심 내용은 다음과 같았다:
@@ -708,7 +708,7 @@ scope="class" fixture의 목적은 클래스 전체에서 데이터를 공유하
 @classmethod를 사용하면 메서드의 첫 번째 인자가 인스턴스가 아닌 클래스 자체로 전달되므로, cls.xxx = 값 형태로 클래스 레벨에 속성을 저장할 수 있다. 이는 scope="class"의 목적과 정확히 일치했다.
 또한 pytest 공식 문서에서도 scope="class" fixture를 정의할 때는 @classmethod 사용을 권장하고 있었다.
 
-#### 3. 해결 과정
+### 3. 해결 과정
 
 최종적으로 fixture를 아래와 같이 수정했다:
 
@@ -721,7 +721,7 @@ def sample_data(cls):
 
 수정 후 PytestRemovedIn10Warning은 사라졌으며, 모든 테스트가 정상적으로 통과했다.
 
-#### 4. 배운 점
+### 4. 배운 점
 
 이번 경험을 통해 단순히 경고 메시지를 보고 대응하는 것이 아니라, 경고가 발생하는 근본 원리를 파고드는 것의 중요성을 다시 확인했다.
 특히 다음과 같은 개념을 더 명확하게 정리할 수 있었다:
@@ -738,3 +738,60 @@ scope="class" fixture는 클래스당 한 번 실행되지만, 각 테스트는 
 | Python Descriptor 프로토콜 | `__get__`, `__set__`, Property | 하 |
 | pytest 고급 사용법 | fixture 실행 순서, Dependency Injection | 중 |
 | Java AOP와 Python 데코레이터 | 개념 비교 | 하 |
+
+## #16. Level 1: 가장 단순한 키워드 겹침 기반 Context Precision의 한계
+
+### 1. 문제 상황
+
+Level 1에서 Context Precision을 가장 단순한 키워드 겹침 방식으로 구현했다.
+
+- 질문과 context를 단어 단위로 분리한 후, 겹침 비율이 threshold=0.3 이상이면 관련 있다고 판단
+- LLM을 전혀 사용하지 않고 순수한 문자열 처리만으로 평가
+
+테스트는 모두 통과했지만, 실제 실행 결과에서 명확한 한계가 드러났다.
+**실행 예시 결과:**
+
+```text
+[Context Precision Score] 0.5
+[Threshold] 0.3
+
+Chunk 0: overlap=0.50 → 관련 있음   (정상)
+Chunk 3: overlap=0.38 → 관련 있음   ← 문제
+```
+
+**문제 사례:**
+
+- Chunk 3 ("The default checkpoint interval is 90 seconds.")
+  - default라는 단어 하나 때문에 overlap=0.38이 나와서 관련 있음으로 판단됨
+  - 하지만 실제로는 질문("What is the default API port for NimbusFlow?")과 거의 관련이 없는 내용
+
+### 2. 원인 분석
+
+이 현상은 **키워드 겹침 기반 방식의 본질적인 한계**에서 비롯된다.
+
+### 3. 주요 한계점
+
+**주요 한계점**
+| 한계 | 설명 | 이번 사례에서의 영향 |
+| --- | --- | --- |
+| **의미 이해 불가능** | 단어의 의미나 맥락을 전혀 고려하지 않음 | default라는 단어만 겹쳐도 관련 있다고 판단 |
+| **중요 키워드와 일반 단어 구분 불가** | 질문에서 핵심적인 단어(API, port)와 일반적인 단어(default, the)를 동일하게 취급 | - |
+| **동의어·유의어 처리 불가** | port와 포트, default와 기본값 등을 같은 의미로 인식하지 못함 | - |
+| **문맥(Context) 무시** | 단어 순서나 문장 전체의 의미를 고려하지 않음 | - |
+| **우연한 겹침에 취약** | 질문과 무관한 문서에서도 우연히 단어가 겹칠 경우 오판 가능 | Chunk 3이 대표적인 예시 |
+
+이 방식은 **"단어가 겹치면 관련이 있을 것이다"**라는 매우 단순한 가정에 기반하고 있기 때문에, 의미적 관련성과 실제 관련성을 구분하지 못하는 구조적 한계를 가지고 있다.
+
+### 4. 배운 점
+
+Level 1을 통해 다음과 같은 점을 명확히 이해할 수 있었다:
+
+- **가장 단순한 방법**은 구현이 쉽고 빠르지만, **의미를 이해하지 못한다는 치명적인 한계**를 가진다.
+- Context Precision을 제대로 평가하기 위해서는 단순한 문자열 겹침을 넘어선 **의미적 판단**이 필요하다는 것을 체감했다.
+- 이후 단계(Level 2)에서는 이 한계를 보완할 수 있는 방향(Embedding 기반 또는 LLM 기반)으로 확장해야 한다는 방향성이 명확해졌다.
+
+**개선 방향 (Level 2에서 고려할 내용)**
+
+- Embedding을 활용한 의미적 유사도 기반 판단
+- LLM을 활용한 관련성 판단 (LLM-as-a-Judge)
+- 질문에서 중요한 키워드를 가중치 있게 처리하는 방식

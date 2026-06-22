@@ -99,6 +99,16 @@
 
 ## 3. RAGAS 평가
 
+**RAG 평가 기능 확장 로드맵**
+| Level | 단계 이름 | 이 단계에서 하는 일 | 이전 단계의 한계점 | 확장 시 추가되는 가치 | 난이도 | 추천 시점 |
+| --- | --- | --- | --- | --- | --- | --- |
+| **0** | 최소 평가 스크립트 | `TextGenerator`를 사용해 Faithfulness(충실도)를 가장 단순한 형태로 측정 | - | 가장 빠르게 동작하는 평가 코드 확보 | 낮음 | 지금 (첫 Task Unit) |
+| **1** | 다중 지표 확장 | Context Precision(문맥 정밀도)까지 측정하도록 확장 | Faithfulness만으로는 검색 품질을 종합적으로 판단하기 어려움 | 검색 품질과 생성 품질을 함께 볼 수 있게 됨 | 중간 | Level 0 완료 후 |
+| **2** | 구조화된 평가 리포트 | 평가 결과를 JSON 파일로 저장하고, 평균 점수/문제 케이스 요약 출력 | 콘솔 출력만으로는 결과 관리와 비교가 어려움 | 평가 결과를 버전 관리하고, 나중에 RAGAS 결과와 비교 가능 | 중간 | Level 1 완료 후 |
+| **3** | RAGAS 기본 연동 | RAGAS 라이브러리를 도입하고, `BaseRagasLLM`을 직접 상속해 연동 시도 | RAGAS의 체계적인 평가 프레임워크와 비교 기능을 사용하지 못함 | RAGAS가 제공하는 공식 메트릭과 자동화된 평가 로직 활용 가능 | 중상 | Level 2 완료 후 판단 |
+| **4** | RAGAS 풀 메트릭 | Faithfulness + Answer Relevancy + Context Precision/Recall을 모두 측정 | 메트릭이 제한적이라 종합적인 품질 평가가 어려움 | RAGAS가 의도한 대로 RAG 파이프라인의 여러 측면을 종합 평가 가능 | 상 | Level 3 성공 시 |
+| **5** | 운영 자동화 | 평가 스크립트를 주기적으로 실행하거나 CI에 붙임 | 일회성으로만 평가가 가능 | 실제 서비스 운영 관점에서 품질을 지속적으로 모니터링 가능 | 상 | Level 4 완료 후 (선택) |
+
 **Level 0 Task Unit — 최소 Faithfulness 평가 스크립트 명세**
 | 항목 | 정의 |
 | --- | --- |
@@ -113,3 +123,15 @@
 | **의존성** | 추가 의존성 없음 |
 | **스크립트 위치** | debugs/evaluate_faithfulness.py |
 | **평가 데이터** | debug_retrieval.py에서 이미 검증된 4개 질문 재사용 |
+
+**Level 1: Context Precision (키워드 기반)**
+| 항목 | 내용 |
+| --- | --- |
+| **목표** | 검색된 context 중 질문과 관련 있는 context의 비율을 가장 단순한 방식으로 계산 |
+| **구현 방식** | 키워드(단어) 겹침 기반 판단 |
+| **Input** | `question` (str), `retrieved_chunks` (list[str]) |
+| **Output** | `context_precision_score` (float, 0.0 ~ 1.0), 각 chunk에 대한 관련성 판단 결과 |
+| **책임** | 검색 품질 평가만 담당. Faithfulness 평가는 하지 않음 |
+| **LLM 사용** | 사용하지 않음 (가장 단순한 형태 유지) |
+| **스크립트 위치** | `debugs/evaluate_context_precision.py` |
+| **평가 데이터** | 기존에 사용하던 질문 세트 재사용 |
