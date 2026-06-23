@@ -1,1 +1,4 @@
 # 06주차 위클리 챌린지 - 회고록
+
+- [[1번 회고록](./rag_project/docs/RETROSPECTIVE.md)] RAG 미니 프로젝트
+- [2번 회고록] 챗봇에게 RAG 아키택처 적용 🚧
