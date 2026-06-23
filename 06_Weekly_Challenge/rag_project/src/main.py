@@ -16,6 +16,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from model.chunker import chunk_by_section
@@ -98,6 +99,32 @@ def query(request: QueryRequest) -> QueryResponse:
     ]
 
     return QueryResponse(answer=answer, retrieved_chunks=retrieved_chunks)
+
+
+@app.post("/query/stream")
+def query_stream(request: QueryRequest) -> StreamingResponse:
+    """
+    질문을 받아 RAG 파이프라인(검색 -> prompt 조립)을 실행한 뒤, 생성 단계만
+    토큰 단위로 스트리밍하여 반환한다. Retrieval/Prompt Augmentation은
+    /query와 동일하며, Generation 결과를 받는 방식만 다르다 (한 번에 vs 점진적으로).
+
+    응답은 Server-Sent Events(SSE) 형식(text/event-stream)으로, 각 토큰을
+    "data: <토큰>\\n\\n" 형태로 전송하고, 끝나면 "data: [DONE]\\n\\n"을 보낸다.
+    """
+    embedder = resources["embedder"]
+    store = resources["store"]
+    generator = resources["generator"]
+
+    query_vector = embedder.encode([request.question])[0]
+    retrieved = retrieve_top_k(query_vector, store, k=request.k)
+    prompt = build_prompt(request.question, retrieved)
+
+    def event_stream():
+        for token in generator.generate_stream(prompt):
+            yield f"data: {token}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
 @app.get("/health")

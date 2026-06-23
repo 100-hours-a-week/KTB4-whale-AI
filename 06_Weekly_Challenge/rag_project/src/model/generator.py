@@ -1,5 +1,5 @@
 """
-Step B: Generation
+Step B: Generation (+ Step C-3: 스트리밍)
 
 책임(Responsibility): prompt(문자열)를 받아 LLM(Gemma 4 E2B-it)으로 응답 텍스트를 생성한다.
 이 단계 이전의 Retrieval, Prompt Augmentation 결과를 입력으로 받는다.
@@ -16,8 +16,11 @@ Step B: Generation
 환경: 로컬 Mac M3 (Apple Silicon) — MPS(Metal Performance Shaders) 디바이스 사용
 """
 
+import time
+from threading import Thread
+
 import torch
-from transformers import AutoModelForCausalLM, AutoProcessor
+from transformers import AutoModelForCausalLM, AutoProcessor, TextIteratorStreamer
 
 
 class TextGenerator:
@@ -30,6 +33,9 @@ class TextGenerator:
 
     AutoTokenizer 대신 AutoProcessor를 사용한다 — Gemma 4 공식 예제 기준으로,
     chat template 적용과 멀티모달 확장성을 함께 지원하는 인터페이스이다.
+    
+    generate(): 전체 텍스트를 한 번에 반환한다 (기존 동작, 평가 등에서 재사용).
+    generate_stream(): 토큰이 생성되는 즉시 하나씩 반환한다 (Step C-3 스트리밍).
     """
 
     def __init__(self, model_name: str = "google/gemma-4-E2B-it"):
@@ -96,6 +102,64 @@ class TextGenerator:
 
         return generated_text.strip()
 
+    def _build_inputs(self, prompt: str):
+        """공통 입력 전처리: chat template 적용 후 토큰화한다."""
+        messages = [{"role": "user", "content": prompt}]
+        text = self.processor.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=True,
+            enable_thinking=False,
+        )
+        return self.processor(text=text, return_tensors="pt").to(self.device)
+
+    def generate_stream(self, prompt: str, max_new_tokens: int = 80):
+        """
+        주어진 prompt로부터 텍스트를 생성하며, 토큰이 만들어지는 즉시 하나씩 반환한다.
+
+        model.generate()는 끝날 때까지 멈추는(blocking) 함수이므로, 별도 스레드에서
+        실행시키고, 이 함수(메인 흐름)는 TextIteratorStreamer를 순회하며 새로 생성된
+        텍스트 조각을 즉시 yield한다 — 생산자(백그라운드 스레드)와 소비자(이 generator)
+        가 분리된 구조이다.
+
+        Args:
+            prompt: build_prompt()로 생성된 완성된 prompt 문자열
+            max_new_tokens: 생성할 최대 토큰 수
+
+        Yields:
+            새로 생성된 텍스트 조각(str). 보통 1개 이상의 토큰 단위.
+
+        Raises:
+            ValueError: prompt가 빈 문자열일 경우
+        """
+        if not prompt.strip():
+            raise ValueError("prompt가 비어 있습니다. 생성할 내용이 없습니다.")
+
+        inputs = self._build_inputs(prompt)
+
+        # skip_prompt=True: 입력 prompt 부분은 스트리밍하지 않고, 새로 생성된 부분만 흘려보낸다.
+        streamer = TextIteratorStreamer(
+            self.processor.tokenizer,
+            skip_prompt=True,
+            skip_special_tokens=True,
+        )
+
+        generation_kwargs = dict(
+            **inputs,
+            streamer=streamer,
+            max_new_tokens=max_new_tokens,
+            do_sample=False,
+        )
+
+        # model.generate()는 blocking 함수이므로 별도 스레드에서 실행한다.
+        thread = Thread(target=self.model.generate, kwargs=generation_kwargs)
+        thread.start()
+
+        for new_text in streamer:
+            yield new_text
+
+        thread.join()
+
 
 if __name__ == "__main__":
     import sys
@@ -103,7 +167,7 @@ if __name__ == "__main__":
 
     sys.path.append(str(Path(__file__).resolve().parent.parent))
     from model.document_loader import load_document
-    from model.chunker import chunk_fixed_size
+    from model.chunker import chunk_by_section
     from model.embedder import TextEmbedder
     from model.vector_store import InMemoryVectorStore
     from model.retriever import retrieve_top_k
@@ -114,7 +178,7 @@ if __name__ == "__main__":
         Path(__file__).resolve().parent.parent.parent / "data" / "nimbusflow_manual.md"
     )
     document = load_document(str(sample_path))
-    chunks = chunk_fixed_size(document, chunk_size=300, chunk_overlap=50)
+    chunks = chunk_by_section(document, chunk_size=300, chunk_overlap=50)
 
     embedder = TextEmbedder()
     vectors = embedder.encode(chunks)
@@ -133,5 +197,14 @@ if __name__ == "__main__":
     generator = TextGenerator()
 
     print(f"[질문] {question}\n")
+    # 방법 1 - 비스트리밍, generate()
+    print("[비스트리밍 답변] ", end="", flush=True)
     answer = generator.generate(prompt)
-    print(f"[답변] {answer}")
+    print()
+
+    # 방법 2 - 스트리밍, generate_stream()
+    # print("[스트리밍 답변] ", end="", flush=True)
+    # for token in generator.generate_stream(prompt):
+    #     print(token, end="", flush=True)
+    #     time.sleep(0.3)  # 토큰 사이에 0.3초 지연을 줘서 점진적으로 출력되는지 눈으로 확인
+    # print()
