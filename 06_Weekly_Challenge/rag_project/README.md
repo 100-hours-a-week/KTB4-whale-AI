@@ -52,7 +52,7 @@ pytest tests/ -v
 ```bash
 .
 ├── data/                          # 지식 베이스 문서
-├── docs/troubleshooting.md        # 트러블슈팅 회고록 (총 22건)
+├── docs/RETROSPECTIVE.md        # 트러블슈팅 회고록 (총 22건)
 ├── debugs/                        # 검증/평가 스크립트
 ├── src/
 │   ├── main.py                    # FastAPI 앱
@@ -280,7 +280,7 @@ Team Falcon --changed_config--> checkpoint_interval_sec (90s -> 15s)
 
 프로젝트 진행 중 발생한 문제와 설계 결정을 시계열 순서로 기록했다. 총 22건.
 
-→ [docs/troubleshooting.md](./docs/troubleshooting.md)
+→ [docs/RETROSPECTIVE.md](./docs/RETROSPECTIVE.md)
 
 주요 항목:
 
