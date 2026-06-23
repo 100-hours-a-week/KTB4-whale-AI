@@ -36,16 +36,25 @@ def find_start_nodes(question: str, graph: dict) -> list[str]:
     return matched_nodes
 
 
-def retrieve_related_edges(question: str, graph: dict) -> list[dict]:
+def retrieve_related_edges(question: str, graph: dict, max_hops: int = 2) -> list[dict]:
     """
-    질문과 관련된 노드를 찾고, 그 노드에 연결된 모든 엣지(양방향)를 반환한다.
+    질문과 관련된 노드를 찾고, 그 노드로부터 최대 max_hops만큼 떨어진
+    모든 엣지를 너비 우선 탐색(BFS)으로 수집한다.
+
+    예: "NF-227을 겪은 팀의 담당자는?" 같은 질문은, 1-hop만으로는
+    "Team Falcon -- experienced_error --> NF-227"만 찾고, 담당자(Mina Park)로
+    이어지는 "Team Falcon -- managed_by --> Mina Park"는 놓치게 된다.
+    max_hops=2로 설정하면, 1-hop에서 새로 발견된 노드(Team Falcon)를 다음
+    탐색의 시작점으로 추가하여, 그 노드와 연결된 엣지까지 마저 수집한다.
 
     Args:
         question: 사용자 질문
         graph: {"nodes": [...], "edges": [...]} 형태의 그래프
+        max_hops: 시작 노드로부터 탐색할 최대 깊이. 기본값 2.
 
     Returns:
         관련된 엣지(dict)의 리스트. 각 엣지는 {"source", "relation", "target"} 형태.
+        같은 엣지가 중복으로 포함되지 않는다.
 
     Raises:
         ValueError: 질문에서 시작 노드를 하나도 찾지 못했을 경우
@@ -58,12 +67,36 @@ def retrieve_related_edges(question: str, graph: dict) -> list[dict]:
             "키워드 매칭 전략의 한계입니다 — 질문에 노드 이름이 정확히 등장해야 합니다."
         )
 
-    related_edges = []
-    for edge in graph["edges"]:
-        if edge["source"] in start_nodes or edge["target"] in start_nodes:
-            related_edges.append(edge)
+    visited_nodes: set[str] = set(start_nodes)
+    current_frontier: set[str] = set(start_nodes)
+    collected_edges: list[dict] = []
+    seen_edge_keys: set[tuple[str, str, str]] = set()
 
-    return related_edges
+    for _ in range(max_hops):
+        next_frontier: set[str] = set()
+
+        for edge in graph["edges"]:
+            touches_frontier = edge["source"] in current_frontier or edge["target"] in current_frontier
+            if not touches_frontier:
+                continue
+
+            edge_key = (edge["source"], edge["relation"], edge["target"])
+            if edge_key not in seen_edge_keys:
+                seen_edge_keys.add(edge_key)
+                collected_edges.append(edge)
+
+            # 아직 방문하지 않은 새 노드는 다음 hop의 탐색 시작점이 된다.
+            for node_id in (edge["source"], edge["target"]):
+                if node_id not in visited_nodes:
+                    next_frontier.add(node_id)
+                    visited_nodes.add(node_id)
+
+        if not next_frontier:
+            break  # 더 이상 확장할 새 노드가 없으면 조기 종료
+
+        current_frontier = next_frontier
+
+    return collected_edges
 
 
 def edges_to_context(edges: list[dict]) -> str:
