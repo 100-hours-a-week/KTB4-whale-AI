@@ -1,5 +1,65 @@
 # RAG Architecture Project
 
+> 카카오테크 부트캠프 AI 실무팀 6주차 챌린지 — 공개 가중치 모델(Gemma 4) 기반 RAG 아키텍처 구축, FastAPI 배포, 스트리밍, RAGAS 평가, Graph RAG까지의 전체 구현 기록.
+
+## 0. 프로젝트 개요
+
+### 아키텍처 흐름
+
+```
+[Vector RAG]
+Document(.md) → Chunking(Section-based) → Embedding(all-MiniLM-L6-v2)
+→ InMemoryVectorStore → Retrieval(cosine similarity) → Prompt Augmentation
+→ Generation(Gemma 4 E2B-it) → 답변
+
+[Graph RAG]
+Document(.md) → 관계 추출(LLM) → Graph(dict/list) → 2-hop BFS Retrieval
+→ Prompt Augmentation → Generation(Gemma 4 E2B-it) → 답변
+```
+
+### 기술 스택
+
+- LLM: Gemma 4 E2B-it (`google/gemma-4-E2B-it`, instruction-tuned)
+- Embedding: `sentence-transformers/all-MiniLM-L6-v2`
+- API: FastAPI + uvicorn
+- 환경: Python 3.14, 로컬 Mac M3 (MPS), `pyproject.toml` 기반 editable install
+
+### 실행 방법
+
+```bash
+# 1. 패키지 설치 (editable install)
+pip install -e .
+
+# 2. FastAPI 서버 실행
+uvicorn src.main:app --reload
+
+# 3. 일반 질의 (Vector RAG)
+curl -X POST http://127.0.0.1:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What is the internal codename of NimbusFlow?"}'
+
+# 4. 스트리밍 질의
+curl -N -X POST http://127.0.0.1:8000/query/stream \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What is the internal codename of NimbusFlow?"}'
+
+# 5. 테스트 실행
+pytest tests/ -v
+```
+
+### 프로젝트 구조
+
+```bash
+.
+├── data/                          # 지식 베이스 문서
+├── docs/troubleshooting.md        # 트러블슈팅 회고록 (총 22건)
+├── debugs/                        # 검증/평가 스크립트
+├── src/
+│   ├── main.py                    # FastAPI 앱
+│   └── model/                     # RAG 파이프라인 모듈
+└── tests/                         # 단위 테스트
+```
+
 ## 1. RAG 구현
 
 **Document Loading 단계 입출력 명세**
@@ -57,7 +117,7 @@
 | 1 → 2 | 효율적 유사도 검색(efficient similarity search) | chunk 수가 많아지면(수만 개 이상) brute-force 비교가 느려짐 |
 | 2 → 3 | 관계 기반 추론(relational reasoning) | "A와 B가 어떻게 연결되는가" 같은 다중 홉(multi-hop) 질문에 대응 |
 
-- 메모리 보관 단계에서 Graph DB 단계로 확장 예정
+- 메모리 보관 단계에서 시작해 최종적으로 Graph RAG(섹션 4)까지 확장했다
 - 의존성(dependency) 관점 설명
   1. 메모리 보관(현재): chunk와 벡터를 그냥 Python 변수(리스트, numpy 배열)로 들고 있는 상태. 지금 목적(RAG 구조 이해)에는 충분함. — Indexing과 Query를 같은 실행(run) 안에서 처리하기 때문.
   2. 왜 다음이 "파일 저장"인가: 지금처럼 매번 스크립트를 실행할 때마다 16개 chunk를 다시 embedding하는 건 비효율(시간 낭비). **"한 번 계산한 걸 디스크에 저장해두고, 다음 실행에서는 다시 계산하지 않고 불러오기만 한다"**는 게 이 단계의 핵심 가치. 이건 FAISS 같은 라이브러리를 쓰든 안 쓰든 항상 필요한 개념이라서, VectorDB로 바로 건너뛰기 전에 "저장 자체"의 개념을 한 번 짚는 게 학습상 유리.
@@ -96,6 +156,15 @@
 | 요청 Body | `{"question": str, "k": int (선택, 기본값 3)}` |
 | 응답 Body | `{"answer": str, "retrieved_chunks": list[{"text": str, "score": float}]}` |
 | Indexing 시점 | FastAPI의 lifespan 이벤트로 서버 시작 시 1회 |
+
+**스트리밍 엔드포인트 명세**
+| 항목 | 정의 |
+| --- | --- |
+| 엔드포인트 | `POST /query/stream` |
+| 요청 Body | `/query`와 동일 |
+| 응답 형식 | Server-Sent Events (`text/event-stream`) |
+| 응답 예시 | `data: <토큰>\n\n` 반복 후 `data: [DONE]\n\n` |
+| Generation 방식 | `TextIteratorStreamer` + 별도 스레드로 `model.generate()` 실행, 메인 스레드는 토큰을 순회하며 즉시 yield |
 
 ## 3. RAGAS 평가
 
@@ -175,3 +244,48 @@
 | Input | 사용자 질문(string) + `edges_to_context()`의 출력(관계 문자열) |
 | Output | LLM에 전달할 완성된 prompt |
 | 기존 `build_prompt()`와의 관계 | 재사용 가능 — Context가 "텍스트 chunk"든 "관계 문자열"이든, "Instruction + Context + Question" 구조는 동일 |
+
+**Entity/Relation 추출 명세**
+| 항목 | 정의 |
+| --- | --- |
+| 추출 대상 | 문서의 구조화된 요약 테이블 섹션 (본문 전체가 아닌, 가장 정리된 부분) |
+| 추출 방식 | LLM에게 고정 패턴(`RELATION: A | relation | B`)으로 답하게 한 뒤 정규표현식으로 파싱 |
+| relation_type | `uses_engine_mode`, `managed_by`, `changed_config`, `experienced_error` 4종류로 제한 |
+| 그래프 표현 | 전용 GraphDB 없이 `{"nodes": [...], "edges": [...]}` 형태의 Python dict/list로 표현 ("근본에서 확장" 원칙) |
+
+**Graph Retrieval 탐색 전략 (2-hop BFS)**
+| 항목 | 정의 |
+| --- | --- |
+| 시작 노드 탐색 | 질문 문자열에 그래프 노드 ID가 포함되는지 키워드 매칭 |
+| 탐색 깊이 | 기본 2-hop (BFS) — 멀티홉 질문(예: "에러를 겪은 팀의 담당자는?") 대응 |
+| 노이즈 방지 | `VALUE_RELATION_TYPES`로 지정된 관계(`uses_engine_mode`, `changed_config`)의 target은 "속성값 노드"로 분류하여 다음 hop 확장에서 제외 — 여러 엔티티가 같은 속성값을 공유할 때 무관한 엔티티까지 끌려오는 문제 방지 (트러블슈팅 #21/#22) |
+
+**실행 예시**
+
+```
+[질문] Who is the manager of the team that experienced NF-227?
+
+[검색된 관계]
+Team Falcon --experienced_error--> NF-227
+Team Falcon --uses_engine_mode--> hybrid_sync
+Team Falcon --managed_by--> Mina Park
+Team Falcon --changed_config--> checkpoint_interval_sec (90s -> 15s)
+
+[답변] Mina Park is the manager of the team that experienced NF-227.
+```
+
+- Vector RAG는 의미적 유사도 기반 검색에 강하지만, "에러 → 담당 팀 → 담당자"처럼 여러 엔티티를 거쳐야 하는 멀티홉 질문에는 약하다. Graph RAG는 관계를 명시적으로 추적하여 이런 질문에 정확히 답할 수 있다.
+
+## 5. 트러블슈팅 회고록
+
+프로젝트 진행 중 발생한 문제와 설계 결정을 시계열 순서로 기록했다. 총 22건.
+
+→ [docs/troubleshooting.md](./docs/troubleshooting.md)
+
+주요 항목:
+
+- Import 경로 해결 과정 (#1, #4~#7): `sys.path.append` → `pyproject.toml` editable install까지 단계적 확장
+- Chunking 전략 개선 (#8, #12): Fixed-size → Section-based, 실제 검색 순위 개선 검증
+- LLM 선택과 모델 변형 (#9, #10): 사이즈 선택 원칙, Base/Instruction-tuned 모델 차이
+- 평가 방법론 고도화 (#16~#20): 키워드 기반 → LLM-as-a-Judge, RAGAS 라이브러리 연동 보류 결정
+- Graph RAG 탐색 개선 (#21, #22): 공유 속성값 노드로 인한 노이즈 발견과 해결
