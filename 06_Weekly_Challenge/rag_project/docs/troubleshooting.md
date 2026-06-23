@@ -1021,3 +1021,52 @@ Team Falcon과 Team Atlas는 둘 다 `engine_mode`를 `hybrid_sync`로 설정하
 
 - VectorDB의 검색 품질 문제(트러블슈팅 #8)와 GraphDB의 탐색 품질 문제가, 표면적으로는 완전히 다른 기술(임베딩 유사도 vs 그래프 순회)에서 발생했지만, **"느슨한 단위로 데이터를 묶으면 무관한 정보가 섞여 검색 품질이 떨어진다"는 동일한 원리**를 공유한다는 것을 확인했다. 이는 특정 기술의 한계가 아니라, 검색/탐색 시스템 일반에 적용되는 더 보편적인 원리로 보인다.
 - 개선 방향을 나열할 때, "이것들이 정말 단계적 확장 관계인지"를 점검하지 않으면 서로 다른 레이어에서 작동하는 해결책들을 마치 순서가 있는 것처럼 잘못 제시할 위험이 있다는 것을 배웠다. 각 방향이 "어디서" 작동하는지(Retrieval vs Generation)를 먼저 분류한 뒤에야, 그것들이 대체재인지 보완재인지를 정확히 판단할 수 있었다.
+
+---
+
+## #22. 노드 타입 구분으로 #21의 공유 속성값 노이즈 해결
+
+> 이 항목은 트러블슈팅 #21에서 발견한 한계를 실제로 개선한 결과를 다룬다.
+
+### 문제 상황
+
+#21에서 검토한 세 가지 개선 방향 — (1) Retrieval 단계에서 노드 타입을 구분해 속성값 노드를 frontier 확장에서 제외, (2) hop 거리 기반 점수화, (3) Generation 단계에서 LLM에게 필터링 위임 — 중 하나를 실제로 구현해야 했다.
+
+### 원인 분석
+
+#21에서 분석한 근본 원인(BFS가 "엔티티 노드"와 "속성값 노드"를 구분하지 않고 동일하게 취급)을 그대로 적용하면, 가장 직접적인 해결책은 (1)이다 — 원인이 "타입 구분의 부재"였으므로, 해결책도 "타입을 구분하는 것"이 되어야 원인을 직접 제거할 수 있다. (2)와 (3)은 원인을 제거하지 않고 결과를 다루는 우회책이므로 보류했다.
+
+타입을 별도로 라벨링하는 시스템을 새로 만들지 않고, 기존 relation_type 4종류 중 `uses_engine_mode`와 `changed_config`의 target만 "값(value)"이라는 패턴을 활용했다 — `managed_by`와 `experienced_error`의 target(사람, 에러코드)은 고유 식별자이므로 "엔티티"로 분류된다.
+
+### 재현 방법
+
+(트러블슈팅 #21의 재현 방법과 동일 — 공유 속성값을 가진 그래프에서 2-hop 이상 탐색 시 노이즈가 재현된다.)
+
+### 해결 과정
+
+- (개선 내용) `VALUE_RELATION_TYPES = {"uses_engine_mode", "changed_config"}` 상수를 추가하고, BFS의 frontier 확장 로직에서 이 relation_type을 통해 도달한 target 노드는 다음 hop의 시작점으로 추가하지 않도록 수정했다.
+  - (추가 수정) `retrieve_related_edges()` 내부에서, 엣지의 `relation`이 `VALUE_RELATION_TYPES`에 속하면 그 target 노드를 `visited_nodes`에는 추가하되 `next_frontier`에는 추가하지 않도록 분기했다.
+- (개선 내용) 수정 후 재실행한 결과, `"What configuration change did Team Atlas make?"` 질문에서 `Team Falcon --uses_engine_mode--> hybrid_sync`라는 무관한 엣지가 더 이상 포함되지 않았다. 동시에 `"Who is the manager of the team that experienced NF-227?"` 질문은 여전히 `Team Falcon --managed_by--> Mina Park`까지 정확히 도달하여, 기존에 의도했던 2-hop 탐색 능력은 그대로 유지되었다.
+
+```bash
+# 수정 후 (.venv) python src/model/graph_retriever.py
+[질문] Who is the manager of the team that experienced NF-227?
+[검색된 관계]
+Team Falcon --experienced_error--> NF-227
+Team Falcon --uses_engine_mode--> hybrid_sync
+Team Falcon --managed_by--> Mina Park
+Team Falcon --changed_config--> checkpoint_interval_sec (90s -> 15s)
+
+[질문] What configuration change did Team Atlas make?
+[검색된 관계]
+Team Atlas --uses_engine_mode--> hybrid_sync
+Team Atlas --managed_by--> Sofia Reyes
+Team Atlas --changed_config--> token_ttl_days (14 -> 1 day)
+Team Atlas --experienced_error--> NF-318
+```
+
+### 배운 점
+
+- 문제의 근본 원인을 정확히 짚어두면(트러블슈팅 #21), 그 원인을 직접 제거하는 해결책이 무엇인지가 비교적 명확하게 드러난다는 것을 확인했다 — "원인이 타입 미구분이었다"는 진단이 "그러면 타입을 구분하면 된다"는 해결책으로 자연스럽게 이어졌다.
+- relation_type 이름 자체에 이미 "이 관계의 target이 엔티티인지 값인지"에 대한 정보가 암묵적으로 들어 있었다는 것을 활용해, 별도의 타입 라벨링 시스템을 새로 만들지 않고도 가장 작은 변경으로 문제를 해결할 수 있었다 — "근본에서 확장" 원칙에서 강조하는, 기존 구조를 최대한 재사용하는 방식이었다.
+- 개선이 새로운 문제(기존에 잘 동작하던 2-hop 탐색을 망가뜨리는 것)를 만들지 않았는지, 이전에 작성한 검증 질문(Mina Park 도달 여부)으로 회귀 확인을 했다는 점이 중요했다 — 한 가지 문제를 고칠 때 다른 정상 동작까지 함께 검증하는 습관이 이번에도 유효했다.

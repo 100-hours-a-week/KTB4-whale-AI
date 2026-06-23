@@ -8,10 +8,18 @@ Step C-4: Graph RAG — Graph Retrieval (키워드 매칭 기반)
 1. 질문 문자열에 그래프 노드 ID가 그대로 포함되어 있는지 확인하여 시작 노드를 찾는다.
 2. 시작 노드와 연결된 모든 엣지(양방향: source 또는 target으로 등장하는 엣지)를 수집한다.
 3. 여러 시작 노드가 발견되면, 각각의 연결된 엣지를 모두 합친다.
+4. (트러블슈팅 #21 개선) 2-hop 이상으로 확장할 때, "속성값(value) 노드"는 다음 hop의
+   탐색 시작점으로 쓰지 않는다 — 여러 엔티티가 같은 값(예: hybrid_sync)을 공유하면,
+   그 값이 "허브"가 되어 무관한 엔티티까지 끌어들이는 노이즈가 발생하기 때문이다.
 
 한계: 질문에 그래프 노드 이름이 정확히 등장하지 않으면 시작 노드를 찾지 못한다.
 이 경우 더 발전된 전략(LLM에게 탐색 계획을 추론시키는 방식)으로 확장이 필요하다.
 """
+
+# 이 relation_type을 통해 도달한 target 노드는 "속성값(value)"으로 취급한다.
+# 값 노드는 여러 엔티티가 공유할 수 있으므로, 다음 hop의 탐색 시작점으로 쓰지 않는다
+# (트러블슈팅 #21: hybrid_sync 같은 공유 값이 허브가 되어 무관한 엔티티를 끌어들이는 문제).
+VALUE_RELATION_TYPES = {"uses_engine_mode", "changed_config"}
 
 
 def find_start_nodes(question: str, graph: dict) -> list[str]:
@@ -46,6 +54,10 @@ def retrieve_related_edges(question: str, graph: dict, max_hops: int = 2) -> lis
     이어지는 "Team Falcon -- managed_by --> Mina Park"는 놓치게 된다.
     max_hops=2로 설정하면, 1-hop에서 새로 발견된 노드(Team Falcon)를 다음
     탐색의 시작점으로 추가하여, 그 노드와 연결된 엣지까지 마저 수집한다.
+
+    단, VALUE_RELATION_TYPES에 해당하는 관계를 통해 도달한 노드(예: hybrid_sync)는
+    다음 hop의 탐색 시작점으로 추가하지 않는다 — 트러블슈팅 #21에서 발견했듯,
+    이런 "속성값" 노드는 여러 엔티티가 공유할 수 있어 허브가 되기 때문이다.
 
     Args:
         question: 사용자 질문
@@ -85,11 +97,19 @@ def retrieve_related_edges(question: str, graph: dict, max_hops: int = 2) -> lis
                 seen_edge_keys.add(edge_key)
                 collected_edges.append(edge)
 
-            # 아직 방문하지 않은 새 노드는 다음 hop의 탐색 시작점이 된다.
+            # 이 엣지가 "값(value)" 관계라면, target은 속성값 노드이므로
+            # 다음 hop의 탐색 시작점으로 추가하지 않는다.
+            is_value_relation = edge["relation"] in VALUE_RELATION_TYPES
+
             for node_id in (edge["source"], edge["target"]):
-                if node_id not in visited_nodes:
-                    next_frontier.add(node_id)
+                if node_id in visited_nodes:
+                    continue
+                if is_value_relation and node_id == edge["target"]:
+                    # value 노드 자체는 방문 처리만 하고, frontier에는 추가하지 않는다.
                     visited_nodes.add(node_id)
+                    continue
+                next_frontier.add(node_id)
+                visited_nodes.add(node_id)
 
         if not next_frontier:
             break  # 더 이상 확장할 새 노드가 없으면 조기 종료
