@@ -133,6 +133,45 @@ def edges_to_context(edges: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def build_graph_prompt(question: str, relation_context: str) -> str:
+    """
+    Graph RAG용 prompt를 조립한다. build_prompt()와 동일한 설계 원칙
+    ("문서/관계에 근거해 답하라", "모르면 모른다고 답하라")을 따르되,
+    Context가 텍스트 chunk가 아니라 그래프 관계(A --relation--> B) 문자열이라는
+    점만 다르다.
+
+    Args:
+        question: 사용자 질문
+        relation_context: edges_to_context()가 생성한 관계 문자열
+                           (예: "Team Falcon --managed_by--> Mina Park")
+
+    Returns:
+        Instruction + Context(관계) + Question이 결합된 prompt 문자열
+
+    Raises:
+        ValueError: relation_context가 빈 문자열일 경우
+    """
+    if not relation_context.strip():
+        raise ValueError(
+            "relation_context가 비어 있습니다. Prompt를 만들기 위해서는 최소 1개의 관계가 필요합니다."
+        )
+
+    prompt = f"""You are a helpful assistant that answers questions based only on the provided facts.
+
+The following facts are given as relationships in the form "A --relation--> B". Use only these facts to answer the question. If the answer cannot be found in these facts, say "I cannot find the answer in the provided facts." Do not make up information that is not in the facts.
+
+Answer in a natural, complete sentence. Do not copy the relation notation (e.g. "A --relation--> B") into your answer.
+
+Facts:
+{relation_context}
+
+Question: {question}
+
+Answer:"""
+
+    return prompt
+
+
 if __name__ == "__main__":
     import sys
     from pathlib import Path
@@ -160,7 +199,13 @@ if __name__ == "__main__":
     ]
 
     for question in questions:
-        print(f"\n[질문] {question}")
+        print(f"\n{'=' * 60}")
+        print(f"[질문] {question}")
+
         related_edges = retrieve_related_edges(question, graph)
         context = edges_to_context(related_edges)
         print(f"[검색된 관계]\n{context}")
+
+        prompt = build_graph_prompt(question, context)
+        answer = generator.generate(prompt)
+        print(f"\n[답변] {answer}")

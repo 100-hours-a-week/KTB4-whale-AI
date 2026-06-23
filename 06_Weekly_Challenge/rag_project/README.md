@@ -159,3 +159,19 @@
 | **LLM 사용** | 사용하지 않음 |
 | **스크립트 위치** | `debugs/evaluate_context_recall.py` |
 | **평가 데이터** | 기존 질문에 Ground Truth(핵심 정보)를 추가하여 사용 |
+
+## 4. Graph RAG
+
+**Graph Retrieval 단계 입출력 명세**
+| 항목 | 정의 |
+| --- | --- |
+| Input (입력) | 사용자 질문(string) + 그래프(`{"nodes": [...], "edges": [...]}`) |
+| Output (출력) | 관련된 엣지(관계) 목록 — LLM에게 줄 context로 사용 |
+| 탐색 전략 | 1단계: 질문에 등장하는 노드 찾기 → 2단계: 그 노드와 연결된 모든 엣지(양방향) 수집 |
+
+**Graph RAG의 Prompt Augmentation 설계**
+| 항목 | 정의 |
+| --- | --- |
+| Input | 사용자 질문(string) + `edges_to_context()`의 출력(관계 문자열) |
+| Output | LLM에 전달할 완성된 prompt |
+| 기존 `build_prompt()`와의 관계 | 재사용 가능 — Context가 "텍스트 chunk"든 "관계 문자열"이든, "Instruction + Context + Question" 구조는 동일 |
