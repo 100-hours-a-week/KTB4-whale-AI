@@ -20,6 +20,7 @@ from model.generator import TextGenerator
 def evaluate_answer_relevancy(
     question: str,
     answer: str,
+    generator: TextGenerator,
 ) -> dict:
     """
     Answer Relevancy를 LLM-as-a-Judge 방식으로 평가한다.
@@ -27,6 +28,8 @@ def evaluate_answer_relevancy(
     Args:
         question: 사용자 질문
         answer: 생성된 답변
+        generator: 평가에 사용할 TextGenerator 인스턴스. 호출하는 쪽에서
+                   미리 생성하여 여러 평가 함수가 모델 로딩을 공유할 수 있게 한다.
 
     Returns:
         {
@@ -42,17 +45,15 @@ def evaluate_answer_relevancy(
             "raw_response": "",
         }
 
-    generator = TextGenerator()
-
     prompt = f"""You are an evaluator that judges whether an answer directly addresses a question.
 
-                Question: {question}
+Question: {question}
 
-                Answer: {answer}
+Answer: {answer}
 
-                Does the above answer directly address the question?
-                Answer with exactly one word: Yes or No.
-                """
+Does the above answer directly address the question?
+Answer with exactly one word: Yes or No.
+"""
     response = generator.generate(prompt, max_new_tokens=10)
     is_relevant = response.strip().lower().startswith("yes")
 
@@ -68,7 +69,8 @@ if __name__ == "__main__":
     question = "What is the default API port for NimbusFlow?"
     answer = "The default API port for NimbusFlow is 8842."
 
-    result = evaluate_answer_relevancy(question, answer)
+    generator = TextGenerator()
+    result = evaluate_answer_relevancy(question, answer, generator)
 
     print("=" * 60)
     print(f"[Answer Relevancy Score] {result['answer_relevancy_score']}")

@@ -22,6 +22,7 @@ from model.generator import TextGenerator
 def evaluate_context_precision(
     question: str,
     retrieved_chunks: list[str],
+    generator: TextGenerator,
 ) -> dict:
     """
     Context Precision을 LLM-as-a-Judge 방식으로 평가한다.
@@ -32,6 +33,8 @@ def evaluate_context_precision(
     Args:
         question: 사용자 질문
         retrieved_chunks: 검색된 context 리스트
+        generator: 평가에 사용할 TextGenerator 인스턴스. 호출하는 쪽에서
+                   미리 생성하여 여러 평가 함수가 모델 로딩을 공유할 수 있게 한다.
 
     Returns:
         {
@@ -45,21 +48,20 @@ def evaluate_context_precision(
             "judgments": [],
         }
 
-    generator = TextGenerator()
     judgments = []
     relevant_count = 0
 
     for i, chunk in enumerate(retrieved_chunks):
         prompt = f"""You are an evaluator that judges whether a piece of context is necessary to answer a question.
 
-                    Question: {question}
+Question: {question}
 
-                    Context:
-                    {chunk}
+Context:
+{chunk}
 
-                    Does the above context contain information that is necessary to answer the question?
-                    Answer with exactly one word: Yes or No.
-                    """
+Does the above context contain information that is necessary to answer the question?
+Answer with exactly one word: Yes or No.
+"""
         response = generator.generate(prompt, max_new_tokens=10)
         is_relevant = response.strip().lower().startswith("yes")
 
@@ -90,7 +92,8 @@ if __name__ == "__main__":
         "The default checkpoint interval is 90 seconds.",
     ]
 
-    result = evaluate_context_precision(question, retrieved_chunks)
+    generator = TextGenerator()
+    result = evaluate_context_precision(question, retrieved_chunks, generator)
 
     print("=" * 60)
     print(f"[Context Precision Score] {result['context_precision_score']}")

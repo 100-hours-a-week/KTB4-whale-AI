@@ -21,6 +21,7 @@ def evaluate_context_recall(
     question: str,
     retrieved_chunks: list[str],
     ground_truth: list[str],
+    generator: TextGenerator,
 ) -> dict:
     """
     Context Recall을 LLM-as-a-Judge 방식으로 평가한다.
@@ -33,6 +34,8 @@ def evaluate_context_recall(
         question: 사용자 질문
         retrieved_chunks: 검색된 context 리스트
         ground_truth: 정답에 필요한 핵심 정보 (문장 리스트)
+        generator: 평가에 사용할 TextGenerator 인스턴스. 호출하는 쪽에서
+                   미리 생성하여 여러 평가 함수가 모델 로딩을 공유할 수 있게 한다.
 
     Returns:
         {
@@ -47,7 +50,6 @@ def evaluate_context_recall(
         }
 
     combined_context = "\n\n".join(retrieved_chunks)
-    generator = TextGenerator()
 
     judgments = []
     matched_count = 0
@@ -96,7 +98,8 @@ if __name__ == "__main__":
         "NimbusFlow는 데이터 파이프라인 엔진이다",
     ]
 
-    result = evaluate_context_recall(question, retrieved_chunks, ground_truth)
+    generator = TextGenerator()
+    result = evaluate_context_recall(question, retrieved_chunks, ground_truth, generator)
 
     print("=" * 60)
     print(f"[Context Recall Score] {result['context_recall_score']}")

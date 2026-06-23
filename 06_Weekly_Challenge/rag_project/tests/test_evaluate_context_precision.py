@@ -36,6 +36,7 @@ class TestEvaluateContextPrecision:
         result = evaluate_context_precision(
             question="dummy question",
             retrieved_chunks=[],
+            generator=None
         )
         assert result["context_precision_score"] == 0.0
         assert result["judgments"] == []
@@ -48,7 +49,7 @@ class TestEvaluateContextPrecision:
             "The weather today is sunny with a light breeze.",
         ]
 
-        result = evaluate_context_precision(question, retrieved_chunks)
+        result = evaluate_context_precision(question, retrieved_chunks, generator)
 
         assert 0.0 <= result["context_precision_score"] <= 1.0
 
@@ -60,7 +61,7 @@ class TestEvaluateContextPrecision:
         question = "What is the default API port for NimbusFlow?"
         retrieved_chunks = ["NimbusFlow exposes a REST API on port 8842 by default."]
 
-        result = evaluate_context_precision(question, retrieved_chunks)
+        result = evaluate_context_precision(question, retrieved_chunks, generator)
 
         assert result["judgments"][0]["is_relevant"] is True
 
@@ -72,7 +73,7 @@ class TestEvaluateContextPrecision:
         question = "What is the default API port for NimbusFlow?"
         retrieved_chunks = ["The weather today is sunny with a light breeze."]
 
-        result = evaluate_context_precision(question, retrieved_chunks)
+        result = evaluate_context_precision(question, retrieved_chunks, generator)
 
         assert result["judgments"][0]["is_relevant"] is False
 
@@ -84,7 +85,7 @@ class TestEvaluateContextPrecision:
         question = "What is the default API port for NimbusFlow?"
         retrieved_chunks = ["NimbusFlow exposes a REST API on port 8842 by default."]
 
-        result = evaluate_context_precision(question, retrieved_chunks)
+        result = evaluate_context_precision(question, retrieved_chunks, generator)
 
         assert "raw_response" in result["judgments"][0]
         assert len(result["judgments"][0]["raw_response"]) > 0

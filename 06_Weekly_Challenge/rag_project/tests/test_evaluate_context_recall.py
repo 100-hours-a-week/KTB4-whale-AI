@@ -31,6 +31,7 @@ class TestEvaluateContextRecall:
             question="dummy question",
             retrieved_chunks=["some context"],
             ground_truth=[],
+            generator=None
         )
         assert result["context_recall_score"] == 0.0
         assert result["judgments"] == []
@@ -41,7 +42,7 @@ class TestEvaluateContextRecall:
         retrieved_chunks = ["NimbusFlow exposes a REST API on port 8842 by default."]
         ground_truth = ["The default port is 8842.", "This information does not exist."]
 
-        result = evaluate_context_recall(question, retrieved_chunks, ground_truth)
+        result = evaluate_context_recall(question, retrieved_chunks, ground_truth, generator)
 
         assert 0.0 <= result["context_recall_score"] <= 1.0
 
@@ -53,7 +54,7 @@ class TestEvaluateContextRecall:
         retrieved_chunks = ["NimbusFlow exposes a REST API on port 8842 by default."]
         ground_truth = ["The default port is 8842."]
 
-        result = evaluate_context_recall(question, retrieved_chunks, ground_truth)
+        result = evaluate_context_recall(question, retrieved_chunks, ground_truth, generator)
 
         assert result["judgments"][0]["is_matched"] is True
 
@@ -67,7 +68,7 @@ class TestEvaluateContextRecall:
         retrieved_chunks = ["NimbusFlow exposes a REST API on port 8842 by default."]
         ground_truth = ["NimbusFlow is a data pipeline engine."]
 
-        result = evaluate_context_recall(question, retrieved_chunks, ground_truth)
+        result = evaluate_context_recall(question, retrieved_chunks, ground_truth, generator)
 
         assert result["judgments"][0]["is_matched"] is False
 
@@ -82,6 +83,6 @@ class TestEvaluateContextRecall:
         retrieved_chunks = ["NimbusFlow exposes a REST API on port 8842 by default."]
         ground_truth = ["API 포트는 8842이다"]
 
-        result = evaluate_context_recall(question, retrieved_chunks, ground_truth)
+        result = evaluate_context_recall(question, retrieved_chunks, ground_truth, generator)
 
         assert result["judgments"][0]["is_matched"] is True

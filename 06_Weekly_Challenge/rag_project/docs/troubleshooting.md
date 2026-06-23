@@ -889,3 +889,83 @@ Context Recall을 구현하면서 다음과 같은 점을 확인했다:
 - LLM을 활용한 관련성 판단 (LLM-as-a-Judge)
 - 각 chunk를 개별적으로 평가한 후 결과를 종합하는 방식 (context를 하나로 합치는 대신)
 - Ground Truth를 자동으로 생성하거나, 더 체계적으로 관리하는 방식
+
+#15. scope="module" fixture를 선언했지만 함수에 전달하지 않아 모델이 매 테스트마다 중복 로딩됨
+
+문제 상황
+
+RAGAS 평가 Level 1(LLM-as-a-Judge) 테스트 14개를 실행했을 때, 전체 실행 시간이 **1522.83초(25분 22초)**로 비정상적으로 길었다. @pytest.fixture(scope="module")로 TextGenerator를 모듈당 1회만 로딩하도록 설계했는데도, 실행 시간은 모델을 매번 새로 로딩하는 것과 비슷한 수준이었다.
+
+원인 분석
+
+테스트 함수들은 generator fixture를 매개변수로 받고 있었지만, 실제로 평가 대상 함수(evaluate_context_precision() 등)를 호출할 때는 다음과 같이 generator를 전달하지 않았다.
+
+pythondef test_clearly_relevant_chunk_is_judged_relevant(self, generator):
+...
+result = evaluate_context_precision(question, retrieved_chunks) # generator 미전달
+
+한편 evaluate_context_precision() 함수 자체는 내부에서 generator = TextGenerator()를 직접 생성하고 있었다. 즉 fixture로 모델을 한 번만 만들어 두었지만, 그 fixture 인스턴스는 테스트 함수에 전달만 되고 실제로는 한 번도 사용되지 않았고, 평가 함수 내부에서 매번 새 모델을 로딩하고 있었다.
+
+근본 원인: 의존성 주입(dependency injection) 패턴을 적용할 때, "주입받는 쪽(fixture를 받는 테스트 함수)"과 "실제로 그 의존성을 사용해야 하는 쪽(evaluate\_\* 함수 내부)"이 분리되어 있다는 것을 놓쳤다. fixture를 매개변수로 받는 것만으로는 아무 효과가 없으며, 그 값을 실제로 필요한 곳까지 명시적으로 전달해야 한다.
+
+재현 방법
+
+scope="module" 등으로 비용이 큰 리소스(모델 등)를 1회만 생성하는 fixture를 정의한다.
+테스트 대상 함수가 내부에서 자체적으로 동일한 종류의 리소스를 생성하도록 구현한다 (즉, 외부에서 주입받지 않는 구조).
+테스트 함수에서 fixture를 매개변수로 받지만, 테스트 대상 함수를 호출할 때 그 fixture 값을 전달하지 않는다.
+테스트를 실행하면, fixture가 선언되어 있어도 테스트 대상 함수 내부에서 매번 리소스를 새로 생성하므로 의도한 재사용 효과가 전혀 나타나지 않는다.
+
+해결 과정
+
+(개선 내용) evaluate_context_precision(), evaluate_context_recall(), evaluate_answer_relevancy() 3개 함수의 시그니처에 generator: TextGenerator 매개변수를 추가하여, 함수 내부에서 직접 모델을 생성하지 않고 외부에서 주입받도록 변경했다 (TextEmbedder에서 이미 적용했던 "모델 로딩과 사용의 분리" 원칙을 동일하게 적용).
+
+(추가 수정) 3개 테스트 파일에서 fixture로 받은 generator를 각 함수 호출에 실제로 전달하도록 수정했다.
+(추가 수정) 빈 입력을 검증하는 테스트(LLM을 호출하지 않고 즉시 반환되는 경우)는 generator=None을 전달했다 — 함수 내부에서 빈 입력일 때는 generator를 사용하지 않고 바로 반환하므로 안전하다.
+
+(개선 내용) 수정 후 재실행한 결과, 전체 실행 시간이 1522.83초 → 257.66초로 약 5.9배 단축되었다. 14개 테스트 모두 동일하게 통과하여, 동작 자체는 변경되지 않았음을 확인했다.
+
+배운 점
+
+@pytest.fixture는 "리소스를 한 번만 만들겠다"는 선언일 뿐, 그 리소스를 실제로 사용하는 코드까지 자동으로 연결해주지는 않는다는 것을 직접 확인했다. fixture를 매개변수로 받는 것과, 그 값을 실제로 활용하는 것은 별개의 단계이며 둘 다 명시적으로 챙겨야 한다.
+비효율이 있어도 테스트는 "통과"하기 때문에, 단순히 PASSED 여부만 보면 이런 구조적 문제를 알아차리기 어렵다. 실행 시간처럼 결과의 정확성과 무관한 지표도 함께 관찰하는 습관이 이런 종류의 문제를 발견하는 데 중요하다는 것을 배웠다.
+"모델 로딩과 사용의 분리"라는 원칙(TextEmbedder에서 처음 적용)을 평가 모듈에도 일관되게 적용해야 한다는 것을 사후적으로 깨달았다 — 처음 설계 시점에 이 원칙을 떠올렸다면 애초에 발생하지 않았을 문제였다.
+
+## #19. `scope="module"` fixture를 선언했지만 함수에 전달하지 않아 모델이 매 테스트마다 중복 로딩됨
+
+### 문제 상황
+
+RAGAS 평가 Level 1(LLM-as-a-Judge) 테스트 14개를 실행했을 때, 전체 실행 시간이 **1522.83초(25분 22초)**로 비정상적으로 길었다. `@pytest.fixture(scope="module")`로 `TextGenerator`를 모듈당 1회만 로딩하도록 설계했는데도, 실행 시간은 모델을 매번 새로 로딩하는 것과 비슷한 수준이었다.
+
+### 원인 분석
+
+테스트 함수들은 `generator` fixture를 매개변수로 받고 있었지만, 실제로 평가 대상 함수(`evaluate_context_precision()` 등)를 호출할 때는 다음과 같이 `generator`를 전달하지 않았다.
+
+```python
+def test_clearly_relevant_chunk_is_judged_relevant(self, generator):
+    ...
+    result = evaluate_context_precision(question, retrieved_chunks)  # generator 미전달
+```
+
+한편 `evaluate_context_precision()` 함수 자체는 내부에서 `generator = TextGenerator()`를 직접 생성하고 있었다. 즉 fixture로 모델을 한 번만 만들어 두었지만, **그 fixture 인스턴스는 테스트 함수에 전달만 되고 실제로는 한 번도 사용되지 않았고**, 평가 함수 내부에서 매번 새 모델을 로딩하고 있었다.
+
+근본 원인: 의존성 주입(dependency injection) 패턴을 적용할 때, "주입받는 쪽(fixture를 받는 테스트 함수)"과 "실제로 그 의존성을 사용해야 하는 쪽(`evaluate_*` 함수 내부)"이 분리되어 있다는 것을 놓쳤다. fixture를 매개변수로 받는 것만으로는 아무 효과가 없으며, 그 값을 실제로 필요한 곳까지 명시적으로 전달해야 한다.
+
+### 재현 방법
+
+1. `scope="module"` 등으로 비용이 큰 리소스(모델 등)를 1회만 생성하는 fixture를 정의한다.
+2. 테스트 대상 함수가 내부에서 자체적으로 동일한 종류의 리소스를 생성하도록 구현한다 (즉, 외부에서 주입받지 않는 구조).
+3. 테스트 함수에서 fixture를 매개변수로 받지만, 테스트 대상 함수를 호출할 때 그 fixture 값을 전달하지 않는다.
+4. 테스트를 실행하면, fixture가 선언되어 있어도 테스트 대상 함수 내부에서 매번 리소스를 새로 생성하므로 의도한 재사용 효과가 전혀 나타나지 않는다.
+
+### 해결 과정
+
+- (개선 내용) `evaluate_context_precision()`, `evaluate_context_recall()`, `evaluate_answer_relevancy()` 3개 함수의 시그니처에 `generator: TextGenerator` 매개변수를 추가하여, 함수 내부에서 직접 모델을 생성하지 않고 외부에서 주입받도록 변경했다 (`TextEmbedder`에서 이미 적용했던 "모델 로딩과 사용의 분리" 원칙을 동일하게 적용).
+  - (추가 수정) 3개 테스트 파일에서 fixture로 받은 `generator`를 각 함수 호출에 실제로 전달하도록 수정했다.
+  - (추가 수정) 빈 입력을 검증하는 테스트(LLM을 호출하지 않고 즉시 반환되는 경우)는 `generator=None`을 전달했다 — 함수 내부에서 빈 입력일 때는 `generator`를 사용하지 않고 바로 반환하므로 안전하다.
+- (개선 내용) 수정 후 재실행한 결과, 전체 실행 시간이 **1522.83초 → 257.66초로 약 5.9배 단축**되었다. 14개 테스트 모두 동일하게 통과하여, 동작 자체는 변경되지 않았음을 확인했다.
+
+### 배운 점
+
+- `@pytest.fixture`는 "리소스를 한 번만 만들겠다"는 선언일 뿐, **그 리소스를 실제로 사용하는 코드까지 자동으로 연결해주지는 않는다**는 것을 직접 확인했다. fixture를 매개변수로 받는 것과, 그 값을 실제로 활용하는 것은 별개의 단계이며 둘 다 명시적으로 챙겨야 한다.
+- 비효율이 있어도 테스트는 "통과"하기 때문에, 단순히 PASSED 여부만 보면 이런 구조적 문제를 알아차리기 어렵다. **실행 시간처럼 결과의 정확성과 무관한 지표도 함께 관찰하는 습관**이 이런 종류의 문제를 발견하는 데 중요하다는 것을 배웠다.
+- "모델 로딩과 사용의 분리"라는 원칙(`TextEmbedder`에서 처음 적용)을 평가 모듈에도 일관되게 적용해야 한다는 것을 사후적으로 깨달았다 — 처음 설계 시점에 이 원칙을 떠올렸다면 애초에 발생하지 않았을 문제였다.

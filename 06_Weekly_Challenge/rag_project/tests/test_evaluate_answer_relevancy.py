@@ -28,6 +28,7 @@ class TestEvaluateAnswerRelevancy:
         result = evaluate_answer_relevancy(
             question="What is the default API port?",
             answer="",
+            generator=None
         )
         assert result["answer_relevancy_score"] == 0.0
         assert result["is_relevant"] is False
@@ -37,7 +38,7 @@ class TestEvaluateAnswerRelevancy:
         question = "What is the default API port for NimbusFlow?"
         answer = "The default API port for NimbusFlow is 8842."
 
-        result = evaluate_answer_relevancy(question, answer)
+        result = evaluate_answer_relevancy(question, answer, generator)
 
         assert result["answer_relevancy_score"] in (0.0, 1.0)
 
@@ -48,7 +49,7 @@ class TestEvaluateAnswerRelevancy:
         question = "What is the default API port for NimbusFlow?"
         answer = "The default API port for NimbusFlow is 8842."
 
-        result = evaluate_answer_relevancy(question, answer)
+        result = evaluate_answer_relevancy(question, answer, generator)
 
         assert result["is_relevant"] is True
         assert result["answer_relevancy_score"] == 1.0
@@ -60,7 +61,7 @@ class TestEvaluateAnswerRelevancy:
         question = "What is the default API port for NimbusFlow?"
         answer = "The weather today is sunny with a light breeze."
 
-        result = evaluate_answer_relevancy(question, answer)
+        result = evaluate_answer_relevancy(question, answer, generator)
 
         assert result["is_relevant"] is False
         assert result["answer_relevancy_score"] == 0.0
