@@ -110,9 +110,34 @@ def main():
         if (epoch + 1) % 10 == 0 or epoch == 0:
             print(f"Epoch [{epoch+1:3d}/{num_epochs}] | Loss: {avg_loss:.4f}")
 
-    # TODO 6: 학습 후 generate 결과 확인
+    # 학습 후 generate 결과 확인
+    print("\n=== 학습 후 생성 결과 확인 ===\n")
 
-    print("\n=== 학습 루프 종료 ===")
+    model.eval()  # 평가 모드로 전환
+
+    test_prompts = [
+        "hello",
+        "today the weather",
+        "i like to",
+    ]
+
+    with torch.no_grad():
+        for prompt in test_prompts:
+            input_ids = tokenizer.encode(prompt)
+            input_tensor = torch.tensor([input_ids])
+
+            generated = model.generate(
+                input_ids=input_tensor,
+                max_new_tokens=15,
+                temperature=0.8,
+                top_k=50
+            )
+
+            generated_text = tokenizer.decode(generated[0].tolist())
+            print(f"Prompt: {prompt}")
+            print(f"Generated: {generated_text}\n")
+
+    print("=== 학습 루프 종료 ===")
 
 
 if __name__ == "__main__":
