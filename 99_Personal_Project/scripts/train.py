@@ -58,7 +58,10 @@ def main():
     model.train()
     print(f"Model initialized with vocab_size={vocab_size}")
 
-    # TODO 4: Loss Function, Optimizer 정의
+    # Loss Function, Optimizer 정의
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=1e-3)
+
     # TODO 5: 학습 루프 구현 (Next Token Prediction)
     # TODO 6: 학습 후 generate 결과 확인
 
