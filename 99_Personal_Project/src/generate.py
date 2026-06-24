@@ -88,27 +88,6 @@ def generate(
 
     # 1. Prompt를 token_ids로 변환
     input_ids = tokenizer.encode(prompt)
-
-    # ============================================================
-    # 임시 워크어라운드 (2026.06.19)
-    # - BPE가 학습하지 못한 토큰은 -1로 반환되는데, 이는 모델의
-    #   Embedding에서 IndexError를 발생시킴.
-    # - Phase 1(연결 안정화)에서는 일단 -1을 제거하여 테스트를
-    #   이어갈 수 있도록 함.
-    # - 장기적으로는 bpe_tokenizer.py에서 <unk> 토큰을 제대로
-    #   도입하고 처리하는 방식으로 변경해야 함.
-    # ============================================================
-    original_length = len(input_ids)
-    input_ids = [tid for tid in input_ids if tid >= 0]
-
-    if len(input_ids) == 0:
-        # 모든 토큰이 OOV인 극단적인 경우 (거의 발생하지 않음)
-        print("[경고] 모든 토큰이 OOV입니다. 빈 프롬프트로 대체합니다.")
-        input_ids = [0]  # 첫 번째 토큰 ID로 대체 (임시)
-
-    if len(input_ids) < original_length:
-        print(f"[워크어라운드] OOV 토큰 {original_length - len(input_ids)}개 제거됨")
-        
     input_tensor = torch.tensor([input_ids])  # (batch=1, seq_len)
 
     # 2. 모델을 통한 생성
