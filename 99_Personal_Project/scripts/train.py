@@ -44,7 +44,20 @@ def main():
     tokenizer.train(train_corpus)
     print(f"Tokenizer Vocabulary size: {len(tokenizer.token_to_id)}")
 
-    # TODO 3: TransformerLanguageModel 초기화
+    # TransformerLanguageModel 초기화
+    vocab_size = len(tokenizer.token_to_id)
+    model = TransformerLanguageModel(
+        vocab_size=vocab_size,
+        d_model=256,
+        num_heads=8,
+        num_layers=4,
+        d_ff=1024,
+        max_len=512,
+        dropout=0.1
+    )
+    model.train()
+    print(f"Model initialized with vocab_size={vocab_size}")
+
     # TODO 4: Loss Function, Optimizer 정의
     # TODO 5: 학습 루프 구현 (Next Token Prediction)
     # TODO 6: 학습 후 generate 결과 확인
