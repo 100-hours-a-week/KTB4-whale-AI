@@ -53,7 +53,7 @@ class TransformerLanguageModel(nn.Module):
 
         return logits
     
-    @torch.no_grad()
+    @torch.no_grad() # Transformer는 모델이 이미 훈련되어 있다고 가정하기 떄문에, 필요 시 별도의 메서드(train, 아직 미구현 상태) 필요
     def generate(self, input_ids, max_new_tokens=50, temperature=1.0, top_k=None):
         """
         텍스트 생성 함수 (Autoregressive Decoding)
@@ -87,8 +87,8 @@ class TransformerLanguageModel(nn.Module):
                 logits[logits < v[:, [-1]]] = float('-inf')
 
             # 확률 분포로 변환 후 다음 토큰 샘플링
-            probs = F.softmax(logits, dim=-1)
-            next_token = torch.multinomial(probs, num_samples=1)
+            probs = F.softmax(logits, dim=-1) # 마지막 차원에 softmax를 적용하라는 의미(vocab 전체에 대한 확률 계산을 위해)
+            next_token = torch.multinomial(probs, num_samples=1) # 확률 분포의 확률에 따라 랜덤하게 하나를 샘플링
 
             # 생성된 토큰을 기존 시퀀스 뒤에 붙임
             input_ids = torch.cat([input_ids, next_token], dim=1)

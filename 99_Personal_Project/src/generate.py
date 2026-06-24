@@ -91,8 +91,6 @@ def generate(
     input_tensor = torch.tensor([input_ids])  # (batch=1, seq_len)
 
     # 2. 모델을 통한 생성
-    # TODO: 현재 model.generate()는 EOS 기반 early stopping을 지원하지 않음.
-    #       따라서 max_new_tokens만큼 무조건 생성함.
     generated_ids = model.generate(
         input_ids=input_tensor,
         max_new_tokens=max_new_tokens,
