@@ -1,8 +1,8 @@
 # scripts/train.py
 
 """
-최소 학습 루프 (2단계)
-- random weights 상태의 모델을 간단히 학습시켜보는 것이 목적
+최소 훈련 루프 (2단계)
+- random weights 상태의 모델을 간단히 훈련시켜보는 것이 목적
 - 작은 데이터로 시작해서 점차 확장하는 방식으로 진행
 """
 
@@ -15,9 +15,9 @@ from tokenizer.bpe_tokenizer import BPETokenizer
 
 
 def main():
-    print("=== 최소 학습 루프 시작 ===\n")
+    print("=== 최소 훈련 루프 시작 ===\n")
 
-    # 학습 데이터 준비 (작은 규모로 시작)
+    # 훈련 데이터 준비 (작은 규모로 시작)
     train_corpus = [
         "hello how are you",
         "i am fine thank you",
@@ -36,8 +36,8 @@ def main():
         "they are watching a movie",
     ]
 
-    # BPE Tokenizer 초기화 및 학습
-    VOCAB_SIZE = 200 # 초기값으로 150~300 정도, 추후 학습하면서 조정하는 방식으로 진행
+    # BPE Tokenizer 초기화 및 훈련
+    VOCAB_SIZE = 200 # 초기값으로 150~300 정도, 추후 훈련하면서 조정하는 방식으로 진행
     # 50~100으로 너무 작으면, <unk>가 많이 발생
     # 500~1000으로 너무 크면, 작은 데이터에서는 의미없는 토큰이 많아질 수 있음
     tokenizer = BPETokenizer(vocab_size=VOCAB_SIZE)
@@ -62,11 +62,11 @@ def main():
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
-    # 학습 루프 구현 (Next Token Prediction)
+    # 훈련 루프 구현 (Next Token Prediction)
     """
-        현재 학습 루프의 특징
-        - 데이터가 매우 작기 때문에 문장 단위로 학습하도록 구현
-        - 배치 처리는 아직 하지 않고, 한 문장씩 학습 (최소 구현)
+        현재 훈련 루프의 특징
+        - 데이터가 매우 작기 때문에 문장 단위로 훈련하도록 구현
+        - 배치 처리는 아직 하지 않고, 한 문장씩 훈련 (최소 구현)
         - num_epochs = 50으로 설정 (나중에 조정 가능)
     """
     num_epochs = 50
@@ -110,8 +110,8 @@ def main():
         if (epoch + 1) % 10 == 0 or epoch == 0:
             print(f"Epoch [{epoch+1:3d}/{num_epochs}] | Loss: {avg_loss:.4f}")
 
-    # 학습 후 generate 결과 확인
-    print("\n=== 학습 후 생성 결과 확인 ===\n")
+    # 훈련 후 generate 결과 확인
+    print("\n=== 훈련 후 생성 결과 확인 ===\n")
 
     model.eval()  # 평가 모드로 전환
 
@@ -137,7 +137,7 @@ def main():
             print(f"Prompt: {prompt}")
             print(f"Generated: {generated_text}\n")
 
-    print("=== 학습 루프 종료 ===")
+    print("=== 훈련 루프 종료 ===")
 
 
 if __name__ == "__main__":
