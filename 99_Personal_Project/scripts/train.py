@@ -6,6 +6,7 @@
 - 작은 데이터로 시작해서 점차 확장하는 방식으로 진행
 """
 
+import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -123,8 +124,14 @@ def main():
             print(f"Prompt: {prompt}")
             print(f"Generated: {generated_text}\n")
 
-    print("=== 훈련 루프 종료 ===")
+    # model 폴더가 없으면 생성
+    os.makedirs("model", exist_ok=True)
 
+    # 모델 저장
+    torch.save(model.state_dict(), "model/korean_model.pt")
+    print("모델 저장 완료: model/korean_model.pt")
+
+    print("=== 훈련 루프 종료 ===")
 
 if __name__ == "__main__":
     main()

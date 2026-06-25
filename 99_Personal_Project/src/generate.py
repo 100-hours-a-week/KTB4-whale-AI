@@ -28,14 +28,16 @@ def _load_model_and_tokenizer():
     if _model is not None and _tokenizer is not None:
         return _model, _tokenizer
 
-    # 한국어 코퍼스 로드
+    # 1. 한국어 코퍼스 로드
     with open("scripts/data/korean_corpus.txt", "r", encoding="utf-8") as f:
         korean_corpus = [line.strip() for line in f if line.strip()]
 
-    _tokenizer = BPETokenizer(vocab_size=1000) # 상한선 역할
+    # 2. BPE Tokenizer 초기화 및 학습
+    _tokenizer = BPETokenizer(vocab_size=300) # 상한선 역할
     _tokenizer.train(korean_corpus)
     
-    vocab_size = len(_tokenizer.token_to_id) # TODO: random weights
+    # 3. 모델 구조 생성
+    vocab_size = len(_tokenizer.token_to_id)
     _model = TransformerLanguageModel(
         vocab_size=vocab_size,
         d_model=256,
@@ -45,7 +47,16 @@ def _load_model_and_tokenizer():
         max_len=512,
         dropout=0.1
     )
-    _model.eval()  # 추론 모드로 설정
+    
+    # 4. 저장된 가중치 로드 (가장 중요한 부분)
+    MODEL_PATH = "model/korean_model.pt"
+    try:
+        _model.load_state_dict(torch.load(MODEL_PATH, map_location="cpu"))
+        print("[generate] 저장된 모델 가중치를 로드했습니다.")
+    except FileNotFoundError:
+        print("[경고] 저장된 모델이 없습니다. random weights로 동작합니다.")
+
+    _model.eval()
 
     return _model, _tokenizer
 
