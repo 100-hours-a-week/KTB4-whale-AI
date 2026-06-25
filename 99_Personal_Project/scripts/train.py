@@ -6,6 +6,7 @@
 - 작은 데이터로 시작해서 점차 확장하는 방식으로 진행
 """
 
+import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -18,26 +19,12 @@ def main():
     print("=== 최소 훈련 루프 시작 ===\n")
 
     # 훈련 데이터 준비 (작은 규모로 시작)
-    train_corpus = [
-        "hello how are you",
-        "i am fine thank you",
-        "what is your name",
-        "my name is gpt",
-        "today the weather is good",
-        "i like to play soccer",
-        "she is reading a book",
-        "he went to school yesterday",
-        "we are learning python",
-        "this is a simple example",
-        "the cat is on the mat",
-        "i want to eat pizza",
-        "she likes to dance",
-        "he plays the guitar well",
-        "they are watching a movie",
-    ]
+    with open("scripts/data/korean_corpus.txt", 'r', encoding='utf-8') as file:
+        train_corpus = [line.strip() for line in file if line.strip()]
+    print(f"학습 데이터 수: {len(train_corpus)} 문장")
 
     # BPE Tokenizer 초기화 및 훈련
-    VOCAB_SIZE = 200 # 초기값으로 150~300 정도, 추후 훈련하면서 조정하는 방식으로 진행
+    VOCAB_SIZE = 300 # 초기값으로 150~300 정도, 추후 훈련하면서 조정하는 방식으로 진행
     # 50~100으로 너무 작으면, <unk>가 많이 발생
     # 500~1000으로 너무 크면, 작은 데이터에서는 의미없는 토큰이 많아질 수 있음
     tokenizer = BPETokenizer(vocab_size=VOCAB_SIZE)
@@ -60,7 +47,7 @@ def main():
 
     # Loss Function, Optimizer 정의
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=1e-3)
+    optimizer = optim.Adam(model.parameters(), lr=3e-4)
 
     # 훈련 루프 구현 (Next Token Prediction)
     """
@@ -116,9 +103,9 @@ def main():
     model.eval()  # 평가 모드로 전환
 
     test_prompts = [
-        "hello",
-        "today the weather",
-        "i like to",
+        "안녕",
+        "오늘 날씨가",
+        "나는 좋아해",
     ]
 
     with torch.no_grad():
@@ -137,8 +124,14 @@ def main():
             print(f"Prompt: {prompt}")
             print(f"Generated: {generated_text}\n")
 
-    print("=== 훈련 루프 종료 ===")
+    # model 폴더가 없으면 생성
+    os.makedirs("model", exist_ok=True)
 
+    # 모델 저장
+    torch.save(model.state_dict(), "model/korean_model.pt")
+    print("모델 저장 완료: model/korean_model.pt")
+
+    print("=== 훈련 루프 종료 ===")
 
 if __name__ == "__main__":
     main()
