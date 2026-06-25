@@ -170,7 +170,7 @@ class BPETokenizer:
             word_tokens = list(word) + ['</w>']
             tokens.extend(word_tokens) # 요소를 평평하게 넣기 위해 append 대신 extend 사용
 
-        print(f"[encode] 초기 tokens: {tokens}") # 디버그: 초기 상태
+        # print(f"[encode] 초기 tokens: {tokens}") # 디버그: 초기 상태
 
         # 2. 학습된 merge_rules 순서대로 병합 적용
         for pair in self.merge_rules:
@@ -196,7 +196,7 @@ class BPETokenizer:
             else:
                 token_ids.append(self.token_to_id[self.unk_token]) # <unk> ID로 치환
 
-        print(f"[encode] 최종 token_ids: {token_ids}")
+        # print(f"[encode] 최종 token_ids: {token_ids}")
         return token_ids
 
     def decode(self, token_ids: list[int]) -> str:
