@@ -28,21 +28,14 @@ def _load_model_and_tokenizer():
     if _model is not None and _tokenizer is not None:
         return _model, _tokenizer
 
-    # === BPE Tokenizer 초기화 (임시) ===
-    _tokenizer = BPETokenizer(vocab_size=1000)
+    # 한국어 코퍼스 로드
+    with open("scripts/data/korean_corpus.txt", "r", encoding="utf-8") as f:
+        korean_corpus = [line.strip() for line in f if line.strip()]
 
-    # TODO: 실제 학습 데이터로 BPE를 학습하거나, 저장된 tokenizer를 로드해야 함
-    dummy_corpus = [
-        "hello world hello",
-        "low lower lowest",
-        "new newer newest",
-        "hello nice to meet you",
-        "weather is good today"
-    ]
-    _tokenizer.train(dummy_corpus)
-
-    # === TransformerLanguageModel 초기화 (random weights) ===
-    vocab_size = len(_tokenizer.token_to_id)
+    _tokenizer = BPETokenizer(vocab_size=1000) # 상한선 역할
+    _tokenizer.train(korean_corpus)
+    
+    vocab_size = len(_tokenizer.token_to_id) # TODO: random weights
     _model = TransformerLanguageModel(
         vocab_size=vocab_size,
         d_model=256,
