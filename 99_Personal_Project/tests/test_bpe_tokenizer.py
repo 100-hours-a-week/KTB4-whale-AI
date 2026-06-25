@@ -53,8 +53,8 @@ def test_bpe_tokenizer():
 
     print("\n✅ 테스트 3 통과: train() 동작\n")
 
-    # ======= 테스트 4: encode() =======
-    print("\n========== 테스트 4: encode() ==========")
+    # ======= 테스트 4: encode() - 학습 데이터 처리 =======
+    print("\n========== 테스트 4: encode() - 학습 데이터 처리 ==========")
     tokenizer = BPETokenizer(vocab_size=30)
     tokenizer.train(["low lower lowest", "new newer newest"])
 
@@ -62,7 +62,20 @@ def test_bpe_tokenizer():
     print(tokenizer.encode("lower"))
     print(tokenizer.encode("hello"))
 
-    print("\n✅ 테스트 4 통과: encode() 동작\n")
+    print("\n✅ 테스트 4 통과: encode() - 학습 데이터 처리 동작\n")
+
+    # ======= 테스트 4: encode() - OOV 처리 테스트 =======
+    print("\n========== 테스트 4: encode() - OOV 처리 테스트 ==========")
+    tokenizer = BPETokenizer(vocab_size=30)
+    tokenizer.train(["hello world", "low lower"])
+
+    # 학습되지 않은 단어
+    result = tokenizer.encode("hello apple banana")
+
+    # <unk> (ID 0)이 포함되어 있는지 확인
+    assert 0 in result, "OOV가 <unk>로 치환되지 않았습니다."
+
+    print("\n✅ 테스트 4 통과: encode() - OOV 처리 테스트 통과\n")
 
     # ======= 테스트 5: encode + decode =======
     print("\n========== 테스트 5: encode + decode ==========")

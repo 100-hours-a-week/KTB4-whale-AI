@@ -13,11 +13,13 @@ class BPETokenizer:
         - 개선 방향: merges_needed 계산 방식 재검토 + vocabulary 구축 로직 정교화
           (RESTROSPECTIVE.md 트러블슈팅 9, 10 참조)
     """
-    def __init__(self, vocab_size: int):
+    def __init__(self, vocab_size: int, unk_token: str = "<unk>"):
         """
         vocab_size: 최종적으로 만들 어휘 사전의 크기
+        unk_token: Out-of-Vacabulary 토큰 (기본값: <unk>)
         """
         self.vocab_size = vocab_size
+        self.unk_token = unk_token
         self.vocab = {} # 최종 vocabulary
         self.merge_rules = [] # 병합 규칙 (학습된 순서대로 저장)
         self.token_to_id = {}
@@ -81,6 +83,10 @@ class BPETokenizer:
         # 3. 최종 vocabulary 및 ID 매핑 생성
         self.vocab = word_freq
 
+        # <unk>는 항상 ID 0으로 고정하여 미리 설정
+        self.token_to_id = {self.unk_token: 0}
+        self.id_to_token = {0: self.unk_token}
+
         # 4. 개선된 vocabulary 구축
         # TODO: 현재 vocabulary 구축 방식은 ad-hoc(임시방편)임.
         #       word_freq의 현재 상태 + merge_rules에서 토큰을 수집하고 있는데,
@@ -101,8 +107,10 @@ class BPETokenizer:
         # token_to_id, id_to_token 생성(토큰을 정렬하여 일관된 순서로 ID 부여)
         sorted_tokens = sorted(all_tokens) # 오름차순
 
-        self.token_to_id = {token: idx for idx, token in enumerate(sorted_tokens)}        
-        self.id_to_token = {idx: token for token, idx in self.token_to_id.items()}
+        # 기존 subword들을 1부터 시작해서 추가
+        for idx, token in enumerate(sorted_tokens, start=1): # <unk>이 0으로 고정이므로 1부터 시작
+            self.token_to_id[token] = idx
+            self.id_to_token[idx] = token
 
     def _get_stats(self, vocab: dict) -> dict:
         """
@@ -160,9 +168,9 @@ class BPETokenizer:
         for word in words:
             # 예: "low" → ['l', 'o', 'w', '</w>']
             word_tokens = list(word) + ['</w>']
-            tokens.extend(word_tokens)
+            tokens.extend(word_tokens) # 요소를 평평하게 넣기 위해 append 대신 extend 사용
 
-        print(f"[encode] 초기 tokens: {tokens}") # 디버그: 초기 상태
+        # print(f"[encode] 초기 tokens: {tokens}") # 디버그: 초기 상태
 
         # 2. 학습된 merge_rules 순서대로 병합 적용
         for pair in self.merge_rules:
@@ -186,9 +194,9 @@ class BPETokenizer:
             if token in self.token_to_id:
                 token_ids.append(self.token_to_id[token])
             else:
-                token_ids.append(-1)   # OOV 표시 (나중에 <unk> 처리 가능)
+                token_ids.append(self.token_to_id[self.unk_token]) # <unk> ID로 치환
 
-        print(f"[encode] 최종 token_ids: {token_ids}")
+        # print(f"[encode] 최종 token_ids: {token_ids}")
         return token_ids
 
     def decode(self, token_ids: list[int]) -> str:
@@ -200,8 +208,8 @@ class BPETokenizer:
             if token_id in self.id_to_token:
                 tokens.append(self.id_to_token[token_id])
             else:
-                # 등록되지 않은 ID는 <unk>로 처리 (필요시 다른 방식으로 변경 가능)
-                tokens.append("<unk>")
+                # 등록되지 않은 ID는 <unk>로 처리
+                tokens.append(self.unk_token)
 
         # 토큰들을 이어붙임
         text = ''.join(tokens)
