@@ -4,6 +4,7 @@ import torch.nn.functional as F
 from model.positional_encoding import PositionalEncoding
 from model.transformer_decoder import TransformerDecoder
 from model.decoder_layer import DecoderLayer
+from model.generation_utils import trim_after_eos
 
 class TransformerLanguageModel(nn.Module):
     def __init__(self, 
@@ -54,7 +55,7 @@ class TransformerLanguageModel(nn.Module):
         return logits
     
     @torch.no_grad() # Transformer는 모델이 이미 훈련되어 있다고 가정하기 떄문에, 필요 시 별도의 메서드(train, 아직 미구현 상태) 필요
-    def generate(self, input_ids, max_new_tokens=50, temperature=1.0, top_k=None):
+    def generate(self, input_ids, max_new_tokens=50, temperature=1.0, top_k=None, eos_token_id=None):
         """
         텍스트 생성 함수 (Autoregressive Decoding)
 
@@ -63,13 +64,24 @@ class TransformerLanguageModel(nn.Module):
             max_new_tokens: 생성할 최대 토큰 수
             temperature: 샘플링 시 다양성 조절 (1.0 = 기본, 낮을수록 보수적)
             top_k: 상위 k개 토큰 중에서만 샘플링 (None이면 전체 사용)
+            eos_token_id: 종료 토큰 ID. None이면 조기 종료를 적용하지 않고
+                          기존과 동일하게 max_new_tokens만큼 무조건 생성한다.
+                          값이 주어지면, 생성된 토큰이 eos_token_id와 일치하는 순간
+                          생성을 멈춘다 (조기 종료).
 
-        Known Limitation (2026.06.19 기준):
-            - EOS 토큰 기반 early stopping이 구현되어 있지 않음.
-            - 따라서 max_new_tokens만큼 무조건 생성함.
+        Returns:
+            생성된 전체 토큰 시퀀스 (batch_size, seq_len + 생성된 길이).
+            eos_token_id가 주어졌고 생성 중 eos가 나온 경우, 반환되는 시퀀스에는
+            eos 토큰 자체가 포함된다 (decode 시점에 trim_after_eos로 제거하는 것을 권장).
+
+        Known Limitation (2026.06.25 기준, EOS 조기 종료 추가):
             - BOS 토큰을 자동으로 붙여주지 않음 (호출하는 쪽에서 처리 필요).
             - 현재는 가중치가 학습되지 않은 상태(random init)에서는 의미 있는 생성이 어려움.
             - temperature / top_k는 지원되지만, repetition_penalty 등 고급 샘플링 기법은 미구현.
+            - (주의 사항) eos_token_id 기반 조기 종료는 batch_size=1을 전제로 구현됨.
+              batch_size > 1인 경우, 시퀀스마다 종료 시점이 다를 수 있어
+              현재 구현은 배치 내 모든 시퀀스가 동시에 멈추는 방식으로 동작하지 않는다.
+              (개별 시퀀스별 조기 종료는 추가 구현이 필요한 확장 과제)
         """
         self.eval()
 
@@ -92,5 +104,9 @@ class TransformerLanguageModel(nn.Module):
 
             # 생성된 토큰을 기존 시퀀스 뒤에 붙임
             input_ids = torch.cat([input_ids, next_token], dim=1)
+
+            # EOS 조기 종료 (batch_size=1 전제)
+            if eos_token_id is not None and next_token.item() == eos_token_id:
+                break
 
         return input_ids

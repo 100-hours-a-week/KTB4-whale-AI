@@ -18,6 +18,7 @@ import torch.nn as nn
 import torch.optim as optim
 
 from model.transformer_model import TransformerLanguageModel
+from model.generation_utils import trim_after_eos
 from tokenizer.bpe_tokenizer import BPETokenizer
 from data_utils.qa_collate import build_qa_training_pair, IGNORE_INDEX
 
@@ -81,6 +82,7 @@ def main():
 
     # 5. 훈련 루프 (Instruction Tuning: 답변 부분만 loss 계산)
     num_epochs = 50
+    eos_id = tokenizer.token_to_id[tokenizer.eos_token]
 
     for epoch in range(num_epochs):
         total_loss = 0
@@ -88,12 +90,17 @@ def main():
 
         for question, answer in qa_pairs:
             question_ids = tokenizer.encode(question)
-            answer_ids = tokenizer.encode(answer)
+            raw_answer_ids = tokenizer.encode(answer)
 
             # 질문 또는 답변이 토큰화 후 비어 있으면 해당 쌍은 건너뜀
-            if len(question_ids) == 0 or len(answer_ids) == 0:
+            # (raw_answer_ids 기준으로 체크해야 함 — eos 추가 후에는 항상 비어있지 않게 되므로)
+            if len(question_ids) == 0 or len(raw_answer_ids) == 0:
                 num_skipped += 1
                 continue
+
+            # 답변 끝에 <eos>를 추가하여, 모델이 "답변이 끝나면 <eos>를 예측해야 한다"는
+            # 패턴을 학습하도록 한다. (이게 빠지면 generate()의 조기 종료가 동작할 수 없음)
+            answer_ids = raw_answer_ids + [eos_id]
 
             inputs, labels = build_qa_training_pair(question_ids, answer_ids)
 
@@ -141,10 +148,16 @@ def main():
                 input_ids=input_tensor,
                 max_new_tokens=15,
                 temperature=0.8,
-                top_k=50
+                top_k=50,
+                eos_token_id=eos_id
             )
 
-            generated_text = tokenizer.decode(generated[0].tolist())
+            generated_ids = generated[0].tolist()
+            # <eos> 이후는 잘라내서 디코딩 (생성 시점에는 이미 eos에서 멈췄지만,
+            # max_new_tokens에 도달해 eos 없이 끝난 경우를 대비해 한 번 더 안전하게 처리)
+            trimmed_ids = trim_after_eos(generated_ids, eos_token_id=eos_id)
+
+            generated_text = tokenizer.decode(trimmed_ids)
             print(f"Prompt: {prompt}")
             print(f"Generated: {generated_text}\n")
 

@@ -91,6 +91,32 @@ def test_bpe_tokenizer():
         print(f"원본: {text:10} → 인코딩: {encoded} → 디코딩: {decoded}")
 
     print("\n✅ 테스트 5 통과: encode + decode 동작\n")
+
+    # ======= 테스트 6: <eos> 토큰 예약 =======
+    print("\n========== 테스트 6: <eos> 토큰 예약 ==========")
+
+    tokenizer = BPETokenizer(vocab_size=30)
+    tokenizer.train(["low lower lowest", "new newer newest"])
+
+    print(f"unk_token: {tokenizer.unk_token} -> id {tokenizer.token_to_id[tokenizer.unk_token]}")
+    print(f"eos_token: {tokenizer.eos_token} -> id {tokenizer.token_to_id[tokenizer.eos_token]}")
+
+    # <unk>=0, <eos>=1로 고정 예약되는지 확인
+    assert tokenizer.token_to_id[tokenizer.unk_token] == 0, "<unk>이 ID 0으로 고정되지 않았습니다."
+    assert tokenizer.token_to_id[tokenizer.eos_token] == 1, "<eos>가 ID 1로 고정되지 않았습니다."
+
+    # id_to_token 역매핑도 정상인지 확인
+    assert tokenizer.id_to_token[0] == tokenizer.unk_token, "id_to_token[0]이 <unk>으로 역매핑되지 않았습니다."
+    assert tokenizer.id_to_token[1] == tokenizer.eos_token, "id_to_token[1]이 <eos>로 역매핑되지 않았습니다."
+
+    # 일반 서브워드 토큰은 ID 2부터 시작해야 함
+    non_special_ids = [
+        idx for token, idx in tokenizer.token_to_id.items()
+        if token not in (tokenizer.unk_token, tokenizer.eos_token)
+    ]
+    assert all(idx >= 2 for idx in non_special_ids), "서브워드 토큰이 ID 2 이전 영역을 침범했습니다."
+
+    print("\n✅ 테스트 6 통과: <eos> 토큰 예약 동작\n")
     
     print("=== 모든 테스트 완료 ===")
 

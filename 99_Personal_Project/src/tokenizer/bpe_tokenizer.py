@@ -5,13 +5,16 @@ class BPETokenizer:
     """
     BPE Tokenizer 구현체
     """
-    def __init__(self, vocab_size: int, unk_token: str = "<unk>"):
+    def __init__(self, vocab_size: int, unk_token: str = "<unk>", eos_token: str = "<eos>"):
         """
         vocab_size: 최종적으로 만들 어휘 사전의 크기
         unk_token: Out-of-Vacabulary 토큰 (기본값: <unk>)
+        eos_token: 시퀀스 종료를 나타내는 토큰 (기본값: <eos>)
+                   학습 데이터의 BPE 병합 대상이 아니라, ID로만 예약되는 특수 토큰.
         """
         self.vocab_size = vocab_size
         self.unk_token = unk_token
+        self.eos_token = eos_token
         self.vocab = {} # 최종 vocabulary
         self.merge_rules = [] # 병합 규칙 (학습된 순서대로 저장)
         self.token_to_id = {}
@@ -58,9 +61,10 @@ class BPETokenizer:
         self.vocab = word_freq
 
         # 4. token_to_id, id_to_token 생성
-        # <unk>는 항상 ID 0으로 고정하여 미리 설정
-        self.token_to_id = {self.unk_token: 0}
-        self.id_to_token = {0: self.unk_token}
+        # 특수 토큰(<unk>, <eos>)은 BPE 병합 대상이 아니라 항상 고정된 ID로 먼저 예약한다.
+        # <unk> = 0, <eos> = 1 로 고정.
+        self.token_to_id = {self.unk_token: 0, self.eos_token: 1}
+        self.id_to_token = {0: self.unk_token, 1: self.eos_token}
 
         # 5. 개선된 vocabulary 구축
         # TODO: 나중에 더 나은 vocabulary selection 전략을 적용해야 함.
@@ -78,8 +82,8 @@ class BPETokenizer:
         # token_to_id, id_to_token 생성(토큰을 정렬하여 일관된 순서로 ID 부여)
         sorted_tokens = sorted(all_tokens) # 오름차순
 
-        # 기존 subword들을 1부터 시작해서 추가
-        for idx, token in enumerate(sorted_tokens, start=1): # <unk>이 0으로 고정이므로 1부터 시작
+        # 기존 subword들을 2부터 시작해서 추가 (<unk>=0, <eos>=1이 이미 고정이므로)
+        for idx, token in enumerate(sorted_tokens, start=2):
             self.token_to_id[token] = idx
             self.id_to_token[idx] = token
 
@@ -128,7 +132,7 @@ class BPETokenizer:
         텍스트를 BPE 방식으로 토큰화하여 token ID 리스트로 반환
 
         Known Limitation:
-            - <bos>, <eos> 등 특수 토큰에 대한 명시적 처리가 아직 없음.
+            - <bos> 등 특수 토큰에 대한 명시적 처리가 아직 없음
             - vocabulary 품질이 낮을 경우, 긴 시퀀스가 짧게 압축되는 현상이 발생할 수 있음.
         """
         
