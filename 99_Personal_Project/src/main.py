@@ -22,8 +22,8 @@ from pydantic import BaseModel
 from rag_pipeline.chunker import chunk_by_section
 from rag_pipeline.document_loader import load_document
 from rag_pipeline.embedder import TextEmbedder
-from model.generator import TextGenerator
-from model.prompt_builder import build_prompt
+from rag_project.src.model.generator import TextGenerator
+from rag_pipeline.prompt_builder import build_prompt
 from rag_pipeline.retriever import retrieve_top_k
 from rag_pipeline.vector_store import InMemoryVectorStore
 

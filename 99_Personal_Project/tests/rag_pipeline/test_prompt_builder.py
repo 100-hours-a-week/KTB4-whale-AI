@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from model.prompt_builder import build_prompt  # noqa: E402
+from rag_pipeline.prompt_builder import build_prompt  # noqa: E402
 
 
 class TestBuildPrompt:
