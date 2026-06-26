@@ -49,7 +49,8 @@ async def lifespan(app: FastAPI):
     store = InMemoryVectorStore()
     store.add(chunks, vectors)
 
-    generator = TextGenerator()
+    generator = TextGenerator(model_name="google/gemma-4-E2B-it")
+    # generator = TextGenerator(model_name="customer_transformer")
 
     resources["embedder"] = embedder
     resources["store"] = store
