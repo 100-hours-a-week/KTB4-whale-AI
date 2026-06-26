@@ -1,4 +1,4 @@
-from model.generation_utils import trim_after_eos
+from custom_transformer.model.utils.generation_utils import trim_after_eos
 
 def test_trim_after_eos():
     print("=== trim_after_eos 테스트 시작 ===\n")

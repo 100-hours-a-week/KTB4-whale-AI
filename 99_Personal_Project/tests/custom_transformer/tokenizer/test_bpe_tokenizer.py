@@ -1,4 +1,4 @@
-from tokenizer.bpe_tokenizer import BPETokenizer
+from custom_transformer.tokenizer.bpe_tokenizer import BPETokenizer
 
 def test_bpe_tokenizer():
     print("=== BPE Tokenizer 테스트 시작 ===\n")

@@ -2,8 +2,8 @@
 from typing import Optional
 import torch
 
-from model.transformer_model import TransformerLanguageModel
-from tokenizer.bpe_tokenizer import BPETokenizer
+from custom_transformer.transformer_model import TransformerLanguageModel
+from custom_transformer.tokenizer.bpe_tokenizer import BPETokenizer
 
 
 # ============================================================

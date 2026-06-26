@@ -10,7 +10,7 @@ build_qa_training_pair() 테스트
 """
 
 import pytest
-from scripts.data_utils.qa_collate import build_qa_training_pair, IGNORE_INDEX
+from custom_transformer.scripts.utils.qa_collate import build_qa_training_pair, IGNORE_INDEX
 
 
 def test_masking_boundary_position():

@@ -1,6 +1,6 @@
 import torch
-from tokenizer.bpe_tokenizer import BPETokenizer
-from model.transformer_model import TransformerLanguageModel
+from custom_transformer.tokenizer.bpe_tokenizer import BPETokenizer
+from custom_transformer.transformer_model import TransformerLanguageModel
 from generate import generate
 
 

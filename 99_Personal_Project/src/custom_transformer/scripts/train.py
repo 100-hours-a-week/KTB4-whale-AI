@@ -17,10 +17,10 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from model.transformer_model import TransformerLanguageModel
-from model.generation_utils import trim_after_eos
-from tokenizer.bpe_tokenizer import BPETokenizer
-from data_utils.qa_collate import build_qa_training_pair, IGNORE_INDEX
+from custom_transformer.transformer_model import TransformerLanguageModel
+from custom_transformer.model.utils.generation_utils import trim_after_eos
+from custom_transformer.tokenizer.bpe_tokenizer import BPETokenizer
+from custom_transformer.scripts.utils.qa_collate import build_qa_training_pair, IGNORE_INDEX
 
 
 def load_qa_pairs(path: str) -> list[tuple[str, str]]:
@@ -162,9 +162,9 @@ def main():
             print(f"Generated: {generated_text}\n")
 
     # 7. 모델 저장
-    os.makedirs("model", exist_ok=True)
-    torch.save(model.state_dict(), "model/korean_model.pt")
-    print("모델 저장 완료: model/korean_model.pt")
+    os.makedirs("checkpoints", exist_ok=True)
+    torch.save(model.state_dict(), "checkpoints/korean_model.pt")
+    print("모델 저장 완료: checkpoints/korean_model.pt")
 
     print("=== Instruction Tuning 훈련 루프 종료 ===")
 

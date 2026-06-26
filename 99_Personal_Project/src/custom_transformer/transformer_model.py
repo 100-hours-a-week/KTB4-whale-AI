@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from model.positional_encoding import PositionalEncoding
-from model.transformer_decoder import TransformerDecoder
-from model.decoder_layer import DecoderLayer
-from model.generation_utils import trim_after_eos
+from custom_transformer.model.positional_encoding import PositionalEncoding
+from custom_transformer.model.transformer_decoder import TransformerDecoder
+from custom_transformer.model.decoder_layer import DecoderLayer
+from custom_transformer.model.utils.generation_utils import trim_after_eos
 
 class TransformerLanguageModel(nn.Module):
     def __init__(self, 

@@ -1,5 +1,5 @@
 import torch
-from model.positional_encoding import PositionalEncoding
+from custom_transformer.model.positional_encoding import PositionalEncoding
 
 # 테스트
 pe = PositionalEncoding(d_model=64, max_len=100)
