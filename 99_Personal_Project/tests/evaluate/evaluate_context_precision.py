@@ -7,7 +7,7 @@ Level 1: Context Precision (LLM-as-a-Judge 기반)
 
 Level 0과의 차이:
 - Level 0(키워드 겹침)은 "단어가 같은가"만 보았기 때문에, 의미는 같지만
-  표현이 다른 경우(예: 질문의 "포트"와 context의 "8842")를 관련 없다고
+  표현이 다른 경우(예: 질문의 "포트"와 context의 "9221")를 관련 없다고
   잘못 판단할 수 있었다.
 - Level 1은 LLM에게 "이 chunk가 질문에 답하는 데 필요한 정보를 담고 있는가"를
   직접 판단하게 하여, 표면적 단어 일치가 아닌 의미적 관련성을 평가한다.
@@ -16,7 +16,7 @@ evaluate_faithfulness.py와 동일한 패턴(prompt 구성 -> TextGenerator.gene
 -> 응답 파싱)을 따른다.
 """
 
-from model.generator import TextGenerator
+from rag_pipeline.generator import TextGenerator
 
 
 def evaluate_context_precision(
@@ -28,7 +28,7 @@ def evaluate_context_precision(
     Context Precision을 LLM-as-a-Judge 방식으로 평가한다.
 
     각 chunk에 대해 "이 chunk가 질문에 답하는 데 필요한 정보를 담고 있는가"를
-    LLM이 Yes/No로 판단하고, 관련 있다고 판단된 chunk의 비율을 점수로 계산한다.
+    LLM이 예/아니오로 판단하고, 관련 있다고 판단된 chunk의 비율을 점수로 계산한다.
 
     Args:
         question: 사용자 질문
@@ -52,18 +52,18 @@ def evaluate_context_precision(
     relevant_count = 0
 
     for i, chunk in enumerate(retrieved_chunks):
-        prompt = f"""You are an evaluator that judges whether a piece of context is necessary to answer a question.
+        prompt = f"""당신은 주어진 context가 질문에 답하는 데 필요한지 판단하는 평가자입니다.
 
-Question: {question}
+질문: {question}
 
 Context:
 {chunk}
 
-Does the above context contain information that is necessary to answer the question?
-Answer with exactly one word: Yes or No.
+위 context가 질문에 답하는 데 필요한 정보를 담고 있습니까?
+정확히 한 단어로만 답하세요: 예 또는 아니오.
 """
         response = generator.generate(prompt, max_new_tokens=10)
-        is_relevant = response.strip().lower().startswith("yes")
+        is_relevant = response.strip().startswith("예")
 
         if is_relevant:
             relevant_count += 1
@@ -84,12 +84,12 @@ Answer with exactly one word: Yes or No.
 
 if __name__ == "__main__":
     # Level 1 테스트용 예시 (Level 0과 동일한 데이터로 비교 가능하게 유지)
-    question = "What is the default API port for NimbusFlow?"
+    question = "DaySync의 기본 API 포트는 무엇인가?"
     retrieved_chunks = [
-        "NimbusFlow exposes a REST API on port 8842 by default.",
-        "The product was developed under the codename Project Driftwood.",
-        "Users can configure the engine mode to solo, cluster, or hybrid_sync.",
-        "The default checkpoint interval is 90 seconds.",
+        "DaySync의 일정 조회 API는 기본적으로 9221번 포트에서 서비스된다.",
+        "개발 초기 단계에서는 내부적으로 프로젝트 새벽별(Project Dawnstar)이라는 코드네임으로 불렸다.",
+        "일정 충돌 허용 모드는 strict 또는 soft 중 선택 가능하다.",
+        "추천 주기는 기본값 7일이다.",
     ]
 
     generator = TextGenerator()

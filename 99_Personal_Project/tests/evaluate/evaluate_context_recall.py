@@ -9,12 +9,14 @@ Level 0과의 차이:
 - Level 0(키워드 기반)은 Ground Truth 문장의 단어가 context에 그대로
   등장하는지만 보았다. Ground Truth가 한국어 문장으로 작성된 경우,
   영어 context와는 단어 자체가 겹치지 않아 항상 매칭에 실패하는 구조적
-  한계가 있었다.
+  한계가 있었다. (DaySync 도메인 전환으로 context 자체도 한국어가 되어,
+  이 구조적 한계가 더는 발생하지 않지만, 평가 방식 자체는 언어 표현과
+  무관하게 의미를 판단해야 한다는 원칙을 유지한다.)
 - Level 1은 LLM에게 "이 Ground Truth 정보가 context로부터 추론 가능한가"를
   언어 표현과 무관하게 의미적으로 판단하게 한다.
 """
 
-from model.generator import TextGenerator
+from rag_pipeline.generator import TextGenerator
 
 
 def evaluate_context_recall(
@@ -27,7 +29,7 @@ def evaluate_context_recall(
     Context Recall을 LLM-as-a-Judge 방식으로 평가한다.
 
     각 Ground Truth 항목에 대해 "이 정보가 검색된 context로부터 추론
-    가능한가"를 LLM이 Yes/No로 판단하고, 추론 가능하다고 판단된 항목의
+    가능한가"를 LLM이 예/아니오로 판단하고, 추론 가능하다고 판단된 항목의
     비율을 점수로 계산한다.
 
     Args:
@@ -55,18 +57,18 @@ def evaluate_context_recall(
     matched_count = 0
 
     for i, gt_sentence in enumerate(ground_truth):
-        prompt = f"""You are an evaluator that judges whether a piece of information can be inferred from a given context.
+        prompt = f"""당신은 주어진 정보가 context로부터 추론 가능한지 판단하는 평가자입니다.
 
 Context:
 {combined_context}
 
-Information to check: {gt_sentence}
+확인할 정보: {gt_sentence}
 
-Can the above information be inferred from the context, regardless of the language it is written in?
-Answer with exactly one word: Yes or No.
+위 정보가 context로부터 추론 가능합니까? (표현 언어와 무관하게 의미만 판단하세요.)
+정확히 한 단어로만 답하세요: 예 또는 아니오.
 """
         response = generator.generate(prompt, max_new_tokens=10)
-        is_matched = response.strip().lower().startswith("yes")
+        is_matched = response.strip().startswith("예")
 
         if is_matched:
             matched_count += 1
@@ -88,14 +90,14 @@ Answer with exactly one word: Yes or No.
 
 if __name__ == "__main__":
     # Level 1 테스트용 예시 (Level 0과 동일한 데이터로 비교 가능하게 유지)
-    question = "What is the default API port for NimbusFlow?"
+    question = "DaySync의 기본 API 포트는 무엇인가?"
     retrieved_chunks = [
-        "NimbusFlow exposes a REST API on port 8842 by default.",
-        "The product was developed under the codename Project Driftwood.",
+        "DaySync의 일정 조회 API는 기본적으로 9221번 포트에서 서비스된다.",
+        "개발 초기 단계에서는 내부적으로 프로젝트 새벽별(Project Dawnstar)이라는 코드네임으로 불렸다.",
     ]
     ground_truth = [
-        "API 포트는 8842이다",
-        "NimbusFlow는 데이터 파이프라인 엔진이다",
+        "API 포트는 9221이다",
+        "DaySync는 팀 일정 관리 시스템이다",
     ]
 
     generator = TextGenerator()

@@ -10,8 +10,7 @@ Test for Level 0: evaluate_faithfulness() in debugs/evaluate_faithfulness.py
 
 import pytest
 
-from debugs.evaluate_faithfulness import evaluate_faithfulness  # noqa: E402
-
+from .evaluate_faithfulness import evaluate_faithfulness  # noqa: E402
 
 class TestEvaluateFaithfulness:
     """evaluate_faithfulness() 함수에 대한 테스트 그룹"""
@@ -21,11 +20,11 @@ class TestEvaluateFaithfulness:
     def sample_data(cls):
         """테스트용 샘플 데이터 (debug_retrieval.py에서 검증된 내용 기반)"""
         return {
-            "question": "What is the internal codename of NimbusFlow during development?",
-            "answer": "The internal codename of NimbusFlow during development was Project Driftwood.",
+            "question": "DaySync의 내부 코드네임은 무엇인가?",
+            "answer": "DaySync의 내부 코드네임은 프로젝트 새벽별(Project Dawnstar)이었다.",
             "retrieved_chunks": [
-                "The product's internal codename during development was \"Project Driftwood.\"",
-                "NimbusFlow is a lightweight data pipeline orchestration engine designed for small to mid-sized data teams.",
+                "개발 초기 단계에서는 내부적으로 \"프로젝트 새벽별(Project Dawnstar)\"이라는 코드네임으로 불렸다.",
+                "DaySync는 팀원들의 일정과 활동 선호도를 관리하기 위해 사내에서 자체 개발한 일정 관리 시스템이다.",
             ],
         }
 

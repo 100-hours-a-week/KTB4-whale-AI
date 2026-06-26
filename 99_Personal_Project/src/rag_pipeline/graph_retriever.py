@@ -9,7 +9,7 @@ Step C-4: Graph RAG — Graph Retrieval (키워드 매칭 기반)
 2. 시작 노드와 연결된 모든 엣지(양방향: source 또는 target으로 등장하는 엣지)를 수집한다.
 3. 여러 시작 노드가 발견되면, 각각의 연결된 엣지를 모두 합친다.
 4. (트러블슈팅 #21 개선) 2-hop 이상으로 확장할 때, "속성값(value) 노드"는 다음 hop의
-   탐색 시작점으로 쓰지 않는다 — 여러 엔티티가 같은 값(예: hybrid_sync)을 공유하면,
+   탐색 시작점으로 쓰지 않는다 — 여러 엔티티가 같은 값(예: 산책)을 공유하면,
    그 값이 "허브"가 되어 무관한 엔티티까지 끌어들이는 노이즈가 발생하기 때문이다.
 
 한계: 질문에 그래프 노드 이름이 정확히 등장하지 않으면 시작 노드를 찾지 못한다.
@@ -18,8 +18,8 @@ Step C-4: Graph RAG — Graph Retrieval (키워드 매칭 기반)
 
 # 이 relation_type을 통해 도달한 target 노드는 "속성값(value)"으로 취급한다.
 # 값 노드는 여러 엔티티가 공유할 수 있으므로, 다음 hop의 탐색 시작점으로 쓰지 않는다
-# (트러블슈팅 #21: hybrid_sync 같은 공유 값이 허브가 되어 무관한 엔티티를 끌어들이는 문제).
-VALUE_RELATION_TYPES = {"uses_engine_mode", "changed_config"}
+# (트러블슈팅 #21: 산책 같은 공유 활동이 허브가 되어 무관한 엔티티를 끌어들이는 문제).
+VALUE_RELATION_TYPES = {"prefers_activity", "changed_config"}
 
 
 def find_start_nodes(question: str, graph: dict) -> list[str]:
@@ -49,13 +49,13 @@ def retrieve_related_edges(question: str, graph: dict, max_hops: int = 2) -> lis
     질문과 관련된 노드를 찾고, 그 노드로부터 최대 max_hops만큼 떨어진
     모든 엣지를 너비 우선 탐색(BFS)으로 수집한다.
 
-    예: "NF-227을 겪은 팀의 담당자는?" 같은 질문은, 1-hop만으로는
-    "Team Falcon -- experienced_error --> NF-227"만 찾고, 담당자(Mina Park)로
-    이어지는 "Team Falcon -- managed_by --> Mina Park"는 놓치게 된다.
-    max_hops=2로 설정하면, 1-hop에서 새로 발견된 노드(Team Falcon)를 다음
+    예: "SC-114를 겪은 팀원의 관리자는?" 같은 질문은, 1-hop만으로는
+    "도윤(Sunrise) -- experienced_conflict --> SC-114"만 찾고, 관리자(서연)로
+    이어지는 "도윤(Sunrise) -- managed_by --> 서연"는 놓치게 된다.
+    max_hops=2로 설정하면, 1-hop에서 새로 발견된 노드(도윤)를 다음
     탐색의 시작점으로 추가하여, 그 노드와 연결된 엣지까지 마저 수집한다.
 
-    단, VALUE_RELATION_TYPES에 해당하는 관계를 통해 도달한 노드(예: hybrid_sync)는
+    단, VALUE_RELATION_TYPES에 해당하는 관계를 통해 도달한 노드(예: 산책)는
     다음 hop의 탐색 시작점으로 추가하지 않는다 — 트러블슈팅 #21에서 발견했듯,
     이런 "속성값" 노드는 여러 엔티티가 공유할 수 있어 허브가 되기 때문이다.
 
@@ -143,7 +143,7 @@ def build_graph_prompt(question: str, relation_context: str) -> str:
     Args:
         question: 사용자 질문
         relation_context: edges_to_context()가 생성한 관계 문자열
-                           (예: "Team Falcon --managed_by--> Mina Park")
+                           (예: "도윤(Sunrise) --managed_by--> 서연")
 
     Returns:
         Instruction + Context(관계) + Question이 결합된 prompt 문자열
@@ -156,18 +156,19 @@ def build_graph_prompt(question: str, relation_context: str) -> str:
             "relation_context가 비어 있습니다. Prompt를 만들기 위해서는 최소 1개의 관계가 필요합니다."
         )
 
-    prompt = f"""You are a helpful assistant that answers questions based only on the provided facts.
+    prompt = f"""당신은 주어진 사실에만 근거하여 질문에 답하는 유능한 어시스턴트입니다.
 
-The following facts are given as relationships in the form "A --relation--> B". Use only these facts to answer the question. If the answer cannot be found in these facts, say "I cannot find the answer in the provided facts." Do not make up information that is not in the facts.
+아래 사실들은 "A --관계--> B" 형태의 관계로 주어집니다. 이 사실들만 사용하여 질문에 답하세요.
+사실에서 답을 찾을 수 없다면 "주어진 사실에서 답을 찾을 수 없습니다."라고 답하세요. 사실에 없는 내용을 지어내지 마세요.
 
-Answer in a natural, complete sentence. Do not copy the relation notation (e.g. "A --relation--> B") into your answer.
+자연스럽고 완전한 문장으로 답하세요. 관계 표기("A --관계--> B")를 답변에 그대로 옮기지 마세요.
 
-Facts:
+사실:
 {relation_context}
 
-Question: {question}
+질문: {question}
 
-Answer:"""
+답변:"""
 
     return prompt
 
@@ -182,7 +183,7 @@ if __name__ == "__main__":
     from rag_pipeline.graph_extractor import build_graph, extract_relations
 
     sample_path = (
-        Path(__file__).resolve().parent.parent.parent / "data" / "nimbusflow_team_incidents.md"
+        Path(__file__).resolve().parent.parent.parent / "data" / "daysync_team_records.md"
     )
     document = load_document(str(sample_path))
     summary_section = document.split("## 4. Summary Table")[1]
@@ -194,8 +195,8 @@ if __name__ == "__main__":
     graph = build_graph(relations)
 
     questions = [
-        "Who is the manager of the team that experienced NF-227?",
-        "What configuration change did Team Atlas make?",
+        "SC-114를 겪은 팀원의 관리자는 누구인가?",
+        "민준이 변경한 설정은 무엇인가?",
     ]
 
     for question in questions:

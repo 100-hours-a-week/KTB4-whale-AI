@@ -1,29 +1,29 @@
 """
-디버깅 스크립트: "8842"를 포함한 chunk가 실제로 몇 번째 인덱스이고,
+디버깅 스크립트: "9221"을 포함한 chunk가 실제로 몇 번째 인덱스이고,
 검색 질문에 대해 몇 위로 검색되는지 확인한다.
 
-트러블슈팅 #8 검증: Fixed-size chunking과 Section-based chunking을
-동일한 절차로 각각 실행하여, 두 전략의 "8842" chunk 순위를 비교한다.
+트러블슈팅 #8 검증 (DaySync 도메인으로 재현): Fixed-size chunking과
+Section-based chunking을 동일한 절차로 각각 실행하여, 두 전략의
+"9221" chunk 순위를 비교한다.
 """
 
-import sys
 from pathlib import Path
 
-sys.path.append(str(Path(__file__).resolve().parent / "src"))
+from rag_pipeline.document_loader import load_document
+from rag_pipeline.chunker import chunk_by_section, chunk_fixed_size
+from rag_pipeline.embedder import TextEmbedder
+from rag_pipeline.vector_store import InMemoryVectorStore
+from rag_pipeline.retriever import cosine_similarity
 
-from model.document_loader import load_document
-from model.chunker import chunk_by_section, chunk_fixed_size
-from model.embedder import TextEmbedder
-from model.vector_store import InMemoryVectorStore
-from model.retriever import cosine_similarity
+DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "daysync_manual.md"
+document = load_document(str(DATA_PATH))
 
-document = load_document("data/nimbusflow_manual.md")
 # (질문, 정답을 찾기 위한 키워드) 쌍으로 직접 지정 — 자동 추출 대신 명확성을 우선한다
 questions = [
-    ("What is the default API port for NimbusFlow?", "8842"),
-    ("What is the internal codename of NimbusFlow during development?", "Driftwood"),
-    ("What is the default checkpoint_interval_sec value?", "checkpoint_interval_sec"),
-    ("What does error code NF-227 mean?", "NF-227"),
+    ("DaySync의 기본 API 포트는 무엇인가?", "9221"),
+    ("DaySync의 내부 코드네임은 무엇인가?", "Dawnstar"),
+    ("preference_threshold의 기본값은 무엇인가?", "preference_threshold"),
+    ("SC-114는 무엇을 의미하는가?", "SC-114"),
 ]
 embedder = TextEmbedder()
 
@@ -52,6 +52,7 @@ for question, target_keyword in questions:
 
     all_scores = []
     for i in range(len(store)):
+        assert store.vectors is not None
         score = cosine_similarity(query_vector, store.vectors[i])
         all_scores.append((i, score))
 
@@ -82,6 +83,7 @@ for question, target_keyword in questions:
 
     all_scores = []
     for i in range(len(store)):
+        assert store.vectors is not None
         score = cosine_similarity(query_vector, store.vectors[i])
         all_scores.append((i, score))
 

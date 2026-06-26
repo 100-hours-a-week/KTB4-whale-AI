@@ -1,5 +1,5 @@
 """
-Test for Step A-1: Document Loading (src/model/document_loader.py)
+Test for Step A-1: Document Loading (src/rag_pipeline/document_loader.py)
 
 검증 항목 (표 24):
 1. 정상 케이스: 존재하는 파일을 정상적으로 로드하는가
@@ -20,7 +20,7 @@ class TestLoadDocument:
     def test_load_existing_file_returns_correct_content(self, tmp_path):
         """정상 케이스 + 내용 검증: 실제 작성한 내용과 로드된 내용이 정확히 일치해야 한다."""
         # Arrange: 임시 파일 생성
-        test_content = "# Sample Title\n\nThis is a test document for NimbusFlow."
+        test_content = "# 샘플 제목\n\n이것은 DaySync를 위한 테스트 문서입니다."
         test_file = tmp_path / "sample.md"
         test_file.write_text(test_content, encoding="utf-8")
 
@@ -53,15 +53,15 @@ class TestLoadDocument:
         with pytest.raises(ValueError):
             load_document(str(whitespace_file))
 
-    def test_load_real_nimbusflow_manual(self):
-        """실제 프로젝트 데이터 파일(nimbusflow_manual.md)이 정상적으로 로드되는지 확인."""
+    def test_load_real_daysync_manual(self):
+        """실제 프로젝트 데이터 파일(daysync_manual.md)이 정상적으로 로드되는지 확인."""
         real_data_path = (
-            Path(__file__).resolve().parent.parent / "data" / "nimbusflow_manual.md"
+            Path(__file__).resolve().parent.parent / "data" / "daysync_manual.md"
         )
 
         result = load_document(str(real_data_path))
 
         # 비어 있지 않아야 하고, 문서의 알려진 키워드를 포함해야 한다
         assert len(result) > 0
-        assert "NimbusFlow" in result
-        assert "Project Driftwood" in result
+        assert "DaySync" in result
+        assert "Project Dawnstar" in result

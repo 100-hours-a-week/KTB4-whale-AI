@@ -15,8 +15,8 @@ Test for Level 1: evaluate_context_precision() in debugs/evaluate_context_precis
 
 import pytest
 
-from debugs.evaluate_context_precision import evaluate_context_precision  # noqa: E402
-from model.generator import TextGenerator  # noqa: E402
+from .evaluate_context_precision import evaluate_context_precision  # noqa: E402
+from rag_pipeline.generator import TextGenerator  # noqa: E402
 
 
 @pytest.fixture(scope="module")
@@ -36,17 +36,17 @@ class TestEvaluateContextPrecision:
         result = evaluate_context_precision(
             question="dummy question",
             retrieved_chunks=[],
-            generator=None
+            generator=None # type: ignore
         )
         assert result["context_precision_score"] == 0.0
         assert result["judgments"] == []
 
     def test_score_is_in_valid_range(self, generator):
         """정상 케이스: 점수가 0.0 ~ 1.0 사이로 반환되는가"""
-        question = "What is the default API port for NimbusFlow?"
+        question = "DaySync의 기본 API 포트는 무엇인가?"
         retrieved_chunks = [
-            "NimbusFlow exposes a REST API on port 8842 by default.",
-            "The weather today is sunny with a light breeze.",
+            "DaySync의 일정 조회 API는 기본적으로 9221번 포트에서 서비스된다.",
+            "오늘 날씨는 맑고 바람이 약하게 분다.",
         ]
 
         result = evaluate_context_precision(question, retrieved_chunks, generator)
@@ -58,8 +58,8 @@ class TestEvaluateContextPrecision:
         의미적 검증: 질문에 직접 답하는 chunk는 "관련 있음"으로 판단되어야 한다.
         (질문과 chunk의 표현이 거의 동일하므로, LLM이 헷갈릴 여지가 거의 없는 케이스)
         """
-        question = "What is the default API port for NimbusFlow?"
-        retrieved_chunks = ["NimbusFlow exposes a REST API on port 8842 by default."]
+        question = "DaySync의 기본 API 포트는 무엇인가?"
+        retrieved_chunks = ["DaySync의 일정 조회 API는 기본적으로 9221번 포트에서 서비스된다."]
 
         result = evaluate_context_precision(question, retrieved_chunks, generator)
 
@@ -70,8 +70,8 @@ class TestEvaluateContextPrecision:
         의미적 검증: 질문과 전혀 무관한 chunk는 "관련 없음"으로 판단되어야 한다.
         (API 포트 질문에 날씨 정보는 명백히 무관한 케이스)
         """
-        question = "What is the default API port for NimbusFlow?"
-        retrieved_chunks = ["The weather today is sunny with a light breeze."]
+        question = "DaySync의 기본 API 포트는 무엇인가?"
+        retrieved_chunks = ["오늘 날씨는 맑고 바람이 약하게 분다."]
 
         result = evaluate_context_precision(question, retrieved_chunks, generator)
 
@@ -82,8 +82,8 @@ class TestEvaluateContextPrecision:
         추적 가능성 검증: 각 judgment에 LLM의 원본 응답(raw_response)이 포함되어,
         판단 근거를 사람이 직접 확인할 수 있어야 한다.
         """
-        question = "What is the default API port for NimbusFlow?"
-        retrieved_chunks = ["NimbusFlow exposes a REST API on port 8842 by default."]
+        question = "DaySync의 기본 API 포트는 무엇인가?"
+        retrieved_chunks = ["DaySync의 일정 조회 API는 기본적으로 9221번 포트에서 서비스된다."]
 
         result = evaluate_context_precision(question, retrieved_chunks, generator)
 

@@ -34,19 +34,19 @@ def build_prompt(question: str, retrieved_chunks: list[tuple[str, float]]) -> st
     # Context 부분: 검색된 chunk들을 번호로 구분하여 나열
     context_blocks = []
     for i, (chunk_text, _score) in enumerate(retrieved_chunks, start=1):
-        context_blocks.append(f"[Document {i}]\n{chunk_text}")
+        context_blocks.append(f"[문서 {i}]\n{chunk_text}")
     context = "\n\n".join(context_blocks)
 
     # Instruction + Context + Question을 결합
-    prompt = f"""You are a helpful assistant that answers questions based only on the provided documents.
+    prompt = f"""당신은 주어진 문서에만 근거하여 질문에 답하는 유능한 어시스턴트입니다.
 
-Use the following documents to answer the question. If the answer cannot be found in the documents, say "I cannot find the answer in the provided documents." Do not make up information that is not in the documents.
+아래 문서를 참고하여 질문에 답하세요. 문서에서 답을 찾을 수 없다면 "주어진 문서에서 답을 찾을 수 없습니다."라고 답하세요. 문서에 없는 내용을 지어내지 마세요.
 
 {context}
 
-Question: {question}
+질문: {question}
 
-Answer:"""
+답변:"""
 
     return prompt
 
@@ -63,7 +63,7 @@ if __name__ == "__main__":
     from rag_pipeline.retriever import retrieve_top_k
 
     sample_path = (
-        Path(__file__).resolve().parent.parent.parent / "data" / "nimbusflow_manual.md"
+        Path(__file__).resolve().parent.parent.parent / "data" / "daysync_manual.md"
     )
     document = load_document(str(sample_path))
     chunks = chunk_fixed_size(document, chunk_size=300, chunk_overlap=50)
@@ -74,7 +74,7 @@ if __name__ == "__main__":
     store = InMemoryVectorStore()
     store.add(chunks, vectors)
 
-    question = "What is the internal codename of NimbusFlow during development?"
+    question = "DaySync의 내부 코드네임은 무엇인가?"
     query_vector = embedder.encode([question])[0]
     retrieved = retrieve_top_k(query_vector, store, k=3)
 

@@ -348,8 +348,8 @@ if __name__ == "__main__":
 
     # Generation — model_name을 바꿔서 직접 비교해볼 수 있다.
     print("[Gemma 4 E2B-it 로딩 중... 처음 실행 시 약 10GB 다운로드가 필요합니다]")
-    generator = TextGenerator(model_name="google/gemma-4-E2B-it")
-    # generator = TextGenerator(model_name="custom_transformer")
+    # generator = TextGenerator(model_name="google/gemma-4-E2B-it")
+    generator = TextGenerator(model_name="custom_transformer")
 
     print(f"[질문] {question}\n")
     print("[비스트리밍 답변] ", end="", flush=True)

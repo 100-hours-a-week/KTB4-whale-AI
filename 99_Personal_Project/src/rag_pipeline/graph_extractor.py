@@ -42,17 +42,17 @@ def extract_relations(summary_table_text: str, generator: TextGenerator) -> list
     if not summary_table_text.strip():
         raise ValueError("summary_table_text가 비어 있습니다. 추출할 내용이 없습니다.")
 
-    prompt = f"""You are a relation extraction assistant. Read the table below and output
-every relationship you find using EXACTLY this format, one per line, with no extra text:
+    prompt = f"""당신은 관계 추출(relation extraction) 어시스턴트입니다. 아래 표를 읽고,
+표에서 찾은 모든 관계를 정확히 아래 형식으로, 한 줄에 하나씩, 다른 텍스트 없이 출력하세요:
 
-RELATION: <entity A> | <relation_type> | <entity B>
+RELATION: <엔티티 A> | <관계 유형> | <엔티티 B>
 
-Use these relation_type values only: uses_engine_mode, managed_by, changed_config, experienced_error
+관계 유형은 다음 값만 사용하세요: prefers_activity, managed_by, changed_config, experienced_conflict
 
-Table:
+표:
 {summary_table_text}
 
-Output only RELATION lines. Do not add explanations.
+RELATION 줄만 출력하세요. 설명을 추가하지 마세요.
 """
     response = generator.generate(prompt, max_new_tokens=300)
 
@@ -94,7 +94,7 @@ if __name__ == "__main__":
     from rag_pipeline.document_loader import load_document
 
     sample_path = (
-        Path(__file__).resolve().parent.parent.parent / "data" / "nimbusflow_team_incidents.md"
+        Path(__file__).resolve().parent.parent.parent / "data" / "daysync_team_records.md"
     )
     document = load_document(str(sample_path))
 

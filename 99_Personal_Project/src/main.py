@@ -39,7 +39,7 @@ async def lifespan(app: FastAPI):
     그리고 Generation에 사용할 모델까지 미리 로딩해 둔다.
     서버 종료 시 별도로 정리할 리소스는 없다.
     """
-    data_path = Path(__file__).resolve().parent.parent / "data" / "nimbusflow_manual.md"
+    data_path = Path(__file__).resolve().parent.parent / "data" / "daysync_manual.md"
     document = load_document(str(data_path))
     chunks = chunk_by_section(document, chunk_size=300, chunk_overlap=50)
 
@@ -60,7 +60,7 @@ async def lifespan(app: FastAPI):
     resources.clear()
 
 
-app = FastAPI(title="NimbusFlow RAG API", lifespan=lifespan)
+app = FastAPI(title="DaySync RAG API", lifespan=lifespan)
 
 
 class QueryRequest(BaseModel):

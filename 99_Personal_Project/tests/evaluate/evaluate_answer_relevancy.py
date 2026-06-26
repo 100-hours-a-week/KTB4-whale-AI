@@ -14,7 +14,7 @@ Level 0과의 차이:
   하여, 표면적 단어 반복이 아닌 의미적 관련성을 평가한다.
 """
 
-from model.generator import TextGenerator
+from rag_pipeline.generator import TextGenerator
 
 
 def evaluate_answer_relevancy(
@@ -33,7 +33,7 @@ def evaluate_answer_relevancy(
 
     Returns:
         {
-            "answer_relevancy_score": float,  # 0.0 또는 1.0 (LLM의 Yes/No 판단)
+            "answer_relevancy_score": float,  # 0.0 또는 1.0 (LLM의 예/아니오 판단)
             "is_relevant": bool,
             "raw_response": str,
         }
@@ -45,17 +45,17 @@ def evaluate_answer_relevancy(
             "raw_response": "",
         }
 
-    prompt = f"""You are an evaluator that judges whether an answer directly addresses a question.
+    prompt = f"""당신은 답변이 질문에 직접적으로 대응하는지 판단하는 평가자입니다.
 
-Question: {question}
+질문: {question}
 
-Answer: {answer}
+답변: {answer}
 
-Does the above answer directly address the question?
-Answer with exactly one word: Yes or No.
+위 답변이 질문에 직접적으로 대응합니까?
+정확히 한 단어로만 답하세요: 예 또는 아니오.
 """
     response = generator.generate(prompt, max_new_tokens=10)
-    is_relevant = response.strip().lower().startswith("yes")
+    is_relevant = response.strip().startswith("예")
 
     return {
         "answer_relevancy_score": 1.0 if is_relevant else 0.0,
@@ -66,8 +66,8 @@ Answer with exactly one word: Yes or No.
 
 if __name__ == "__main__":
     # Level 1 테스트용 예시 (Level 0과 동일한 데이터로 비교 가능하게 유지)
-    question = "What is the default API port for NimbusFlow?"
-    answer = "The default API port for NimbusFlow is 8842."
+    question = "DaySync의 기본 API 포트는 무엇인가?"
+    answer = "DaySync의 기본 API 포트는 9221이다."
 
     generator = TextGenerator()
     result = evaluate_answer_relevancy(question, answer, generator)

@@ -1,12 +1,12 @@
 """
-Test for Step A-2: Chunking (src/model/chunker.py)
+Test for Step A-2: Chunking (src/rag_pipeline/chunker.py)
 
 검증 항목:
 1. 정상 케이스: 의도한 chunk_size, chunk_overlap에 맞게 분할되는가
 2. Overlap 검증: 인접한 두 chunk가 실제로 겹치는 부분을 공유하는가
 3. 예외 케이스: chunk_overlap >= chunk_size일 때 ValueError가 발생하는가
 4. 경계 케이스: 빈 텍스트, chunk_size보다 짧은 텍스트 처리
-5. 실제 데이터 통합 검증: nimbusflow_manual.md가 정상적으로 분할되는가
+5. 실제 데이터 통합 검증: daysync_manual.md가 정상적으로 분할되는가
 """
 
 from pathlib import Path
@@ -70,10 +70,10 @@ class TestChunkFixedSize:
         assert len(chunks) == 1
         assert chunks[0] == text
 
-    def test_chunk_real_nimbusflow_manual(self):
-        """실제 데이터 통합 검증: nimbusflow_manual.md가 정상적으로 분할되고, 핵심 정보가 보존되는지 확인."""
+    def test_chunk_real_daysync_manual(self):
+        """실제 데이터 통합 검증: daysync_manual.md가 정상적으로 분할되고, 핵심 정보가 보존되는지 확인."""
         real_data_path = (
-            Path(__file__).resolve().parent.parent / "data" / "nimbusflow_manual.md"
+            Path(__file__).resolve().parent.parent / "data" / "daysync_manual.md"
         )
         document = load_document(str(real_data_path))
 
@@ -85,9 +85,9 @@ class TestChunkFixedSize:
         # 모든 chunk를 합쳤을 때(중복 제외하고 단순 검사) 핵심 키워드가
         # 적어도 하나의 chunk에는 보존되어 있어야 한다 (overlap 덕분에 경계에서 잘려도 살아남아야 함)
         combined_lower = " ".join(chunks).lower()
-        assert "nimbusflow" in combined_lower
-        assert "nf-227" in combined_lower
-        assert "project driftwood" in combined_lower
+        assert "daysync" in combined_lower
+        assert "sc-114" in combined_lower
+        assert "project dawnstar" in combined_lower
 
 
 class TestChunkBySection:
@@ -140,22 +140,22 @@ class TestChunkBySection:
 
     def test_section_chunking_separates_unrelated_topics_in_real_manual(self):
         """
-        실제 데이터 통합 검증 (트러블슈팅 #8 회귀 테스트):
-        "8842"(API Usage 섹션)가 "Drift Score"(Configuration 섹션)와
+        실제 데이터 통합 검증 (트러블슈팅 #8 회귀 테스트, DaySync 도메인으로 재현):
+        "9221"(API 사용법 섹션)이 "SC-114"(일정 충돌 처리 섹션)와
         서로 다른 chunk에 분리되어 있어야 한다 — fixed-size chunking에서 섞였던 문제가
         section-based chunking에서는 해결되었는지 확인한다.
         """
         real_data_path = (
-            Path(__file__).resolve().parent.parent / "data" / "nimbusflow_manual.md"
+            Path(__file__).resolve().parent.parent / "data" / "daysync_manual.md"
         )
         document = load_document(str(real_data_path))
 
         chunks = chunk_by_section(document, chunk_size=300, chunk_overlap=50)
 
-        # "8842"가 포함된 chunk를 찾는다
-        chunks_with_port = [c for c in chunks if "8842" in c]
+        # "9221"이 포함된 chunk를 찾는다
+        chunks_with_port = [c for c in chunks if "9221" in c]
         assert len(chunks_with_port) > 0
 
-        # "8842"가 포함된 chunk에는 "Drift Score"(다른 섹션의 내용)가 섞이지 않아야 한다
+        # "9221"이 포함된 chunk에는 "SC-114"(다른 섹션의 내용)가 섞이지 않아야 한다
         for chunk in chunks_with_port:
-            assert "Drift Score" not in chunk
+            assert "SC-114" not in chunk

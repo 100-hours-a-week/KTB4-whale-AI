@@ -10,8 +10,8 @@ Test for Level 1: evaluate_answer_relevancy() in debugs/evaluate_answer_relevanc
 
 import pytest
 
-from debugs.evaluate_answer_relevancy import evaluate_answer_relevancy  # noqa: E402
-from model.generator import TextGenerator  # noqa: E402
+from .evaluate_answer_relevancy import evaluate_answer_relevancy  # noqa: E402
+from rag_pipeline.generator import TextGenerator  # noqa: E402
 
 
 @pytest.fixture(scope="module")
@@ -26,17 +26,17 @@ class TestEvaluateAnswerRelevancy:
     def test_empty_answer_returns_zero_score_without_llm_call(self):
         """예외 케이스: 빈 답변을 넣으면 LLM 호출 없이 즉시 0.0을 반환해야 한다."""
         result = evaluate_answer_relevancy(
-            question="What is the default API port?",
+            question="기본 API 포트는 무엇인가?",
             answer="",
-            generator=None
+            generator=None # type: ignore
         )
         assert result["answer_relevancy_score"] == 0.0
         assert result["is_relevant"] is False
 
     def test_score_is_binary(self, generator):
         """설계 검증: 점수가 0.0 또는 1.0 중 하나로만 반환되어야 한다 (이진 판단)."""
-        question = "What is the default API port for NimbusFlow?"
-        answer = "The default API port for NimbusFlow is 8842."
+        question = "DaySync의 기본 API 포트는 무엇인가?"
+        answer = "DaySync의 기본 API 포트는 9221이다."
 
         result = evaluate_answer_relevancy(question, answer, generator)
 
@@ -46,8 +46,8 @@ class TestEvaluateAnswerRelevancy:
         """
         의미적 검증: 질문에 직접 대응하는 답변은 관련 있다고 판단되어야 한다.
         """
-        question = "What is the default API port for NimbusFlow?"
-        answer = "The default API port for NimbusFlow is 8842."
+        question = "DaySync의 기본 API 포트는 무엇인가?"
+        answer = "DaySync의 기본 API 포트는 9221이다."
 
         result = evaluate_answer_relevancy(question, answer, generator)
 
@@ -58,8 +58,8 @@ class TestEvaluateAnswerRelevancy:
         """
         의미적 검증: 질문과 전혀 무관한 답변은 관련 없다고 판단되어야 한다.
         """
-        question = "What is the default API port for NimbusFlow?"
-        answer = "The weather today is sunny with a light breeze."
+        question = "DaySync의 기본 API 포트는 무엇인가?"
+        answer = "오늘 날씨는 맑고 바람이 약하게 분다."
 
         result = evaluate_answer_relevancy(question, answer, generator)
 
