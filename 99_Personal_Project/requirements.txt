@@ -2,5 +2,9 @@ fastapi
 uvicorn[standard]
 pydantic
 torch
+torchvision
 pytest
 pyright
+transformers
+sentence_transformers
+pillow

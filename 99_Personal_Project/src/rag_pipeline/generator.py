@@ -99,7 +99,7 @@ class TextGenerator:
             self.device = "cpu"
 
         self.processor = AutoProcessor.from_pretrained(self.model_name)
-        self.model = AutoModelForCausalLM.from_pretrained(self.model_name).to(self.device)
+        self.model = AutoModelForCausalLM.from_pretrained(self.model_name).to(self.device) # type:ignore
 
     # ------------------------------------------------------------------
     # 초기화 — 커스텀 Transformer
@@ -195,10 +195,10 @@ class TextGenerator:
         input_length = inputs["input_ids"].shape[1]
 
         with torch.no_grad():
-            output_ids = self.model.generate(
+            output_ids = self.model.generate( # type: ignore
                 **inputs,
                 max_new_tokens=max_new_tokens,
-                do_sample=False,  # 학습/검증 목적상 결정론적(deterministic) 출력을 위해 greedy decoding 사용
+                do_sample=False,  # type: ignore
             )
 
         # 생성된 전체 토큰에서, 입력 prompt에 해당하는 부분을 제외하고 새로 생성된 부분만 추출
@@ -223,7 +223,7 @@ class TextGenerator:
 
         # 3. 생성 (학습된 eos_token_id로 조기 종료 적용)
         with torch.no_grad():
-            generated = self.model.generate(
+            generated = self.model.generate( # type: ignore
                 input_ids=input_tensor,
                 max_new_tokens=max_new_tokens,
                 temperature=0.8,
@@ -307,7 +307,7 @@ class TextGenerator:
         )
 
         # model.generate()는 blocking 함수이므로 별도 스레드에서 실행한다.
-        thread = Thread(target=self.model.generate, kwargs=generation_kwargs)
+        thread = Thread(target=self.model.generate, kwargs=generation_kwargs) # type: ignore
         thread.start()
 
         for new_text in streamer:
