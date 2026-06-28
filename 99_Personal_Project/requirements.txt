@@ -8,3 +8,7 @@ pyright
 transformers
 sentence_transformers
 pillow
+langchain-core
+langchain-community
+langchain-text-splitters
+langchain-huggingface
