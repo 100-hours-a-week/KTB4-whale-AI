@@ -6,12 +6,13 @@ Root from Expansion 원칙에 따라, RAG 파이프라인과의 통합 없이
 """
 
 from rag_pipeline.generator import TextGenerator
-
+from typing import Optional
 
 def evaluate_faithfulness(
     question: str,
     answer: str,
     retrieved_chunks: list[str],
+    generator: Optional[TextGenerator] = None
 ) -> dict:
     """
     생성된 답변의 Faithfulness(충실도)를 평가한다.
@@ -52,7 +53,7 @@ def evaluate_faithfulness(
                     위 Context에 있는 정보만 사용하세요. 외부 지식을 사용하지 마세요.
                 """
 
-    generator = TextGenerator()
+    generator = generator or TextGenerator()
     response = generator.generate(prompt, max_new_tokens=300)
 
     # 간단한 파싱 (실제로는 더 견고한 파싱이 필요하지만, Level 0에서는 단순화)

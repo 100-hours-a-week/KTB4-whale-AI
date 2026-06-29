@@ -18,7 +18,7 @@
 | 1 | `custom_transformer` 처리 | LangChain의 LLM(언어 모델) 계층으로 wrapping하고, Gemma 4 E2B-it과 스위처블(switchable) 구조 유지 | 기존 `generator.py`의 `TextGenerator(model_name=...)` 스위치 설계를 그대로 계승 |
 | 2 | GraphRAG(`graph_extractor.py`, `graph_retriever.py`) | 이번 범위 제외 | 현행 구현 그대로 유지, 추후 별도 작업 |
 | 3 | 전환 방식 | `rag_pipeline/`는 그대로 두고, 신규 패키지에 모듈별로 점진적으로 작성 | 비교 가능한 기준선 보존 |
-| 4 | 평가 코드(`tests/evaluate/*`, RAGAS 스타일) | 이번 범위 제외 — 추후 LangSmith로 이전 예정 | LangGraph·LangSmith 자체도 이번 범위 밖 |
+| 4 | 평가 코드(`tests/evaluate/*`, RAGAS 스타일) | 기존 평가 코드는 `rag_pipeline` 기준선용으로 보존, `langchain_pipeline` 평가는 LangSmith Tracing + Dataset 기반으로 전환 (§6 10단계) | LangGraph는 범위 밖, LangSmith는 활성화 |
 | 5 | 저장-검색 결합 구조 (§4.1) | 절충안 없이 LangChain의 결합된 `VectorStore` 인터페이스를 그대로 채택 | thin wrapper는 다른 VectorStore 구현체(FAISS, Chroma 등)로 교체할 때 호환성을 해칠 수 있음 |
 | 6 | 임베딩 함수 소유권 이전 (§4.2) | 절충안 없이 LangChain 방식(Embeddings를 VectorStore 생성자에 주입) 채택 | 표 1 #5와 동일한 원칙(절충 없이 LangChain 방식 사용) 적용 |
 | 7 | RAG 체인 패턴 (§5) | LCEL Runnable 직접 조립 방식 채택. `create_agent` 기반 RAG Agent는 2차 확장 과제로 보류 | `custom_transformer`가 tool-calling 미지원, 검색 1회·생성 1회의 단일 패스 구조로 충분 |
@@ -190,12 +190,13 @@ RAG Chain에 가깝다. **결정(표 1 #7)**: `create_agent`를 거치지 않고
 | 4 | `vector_store.py` | `InMemoryVectorStore(embedding=...)`, `add_documents()`, `as_retriever(k=3)` | 식별 가능한 mock 벡터 대신 [`DeterministicFakeEmbedding`](https://reference.langchain.com/python/langchain-core/embeddings/fake/DeterministicFakeEmbedding) 사용 검토 | 2, 3 |
 | 5 | `prompt.py` | `ChatPromptTemplate`, 기존 instruction 문구·포맷 그대로 유지 | 포맷팅 결과에 instruction/context/question이 모두 포함되는지 검증 | 없음 |
 | 6 | `llm.py` (Gemma) | 기존 MPS 디바이스 선택 로직 유지, `transformers.pipeline`을 만들어 `HuggingFacePipeline`으로 wrapping (§4.4, 표 3) | `invoke()` 결과가 문자열인지 검증, `stream()` 결과가 다중 청크로 도착하는지 검증 (모델 로딩이 무거우므로 `@pytest.mark.slow` 검토) | 없음 |
-| 7 | `llm.py` (custom_transformer) | `LLM` 서브클래스 작성, `_call()`에 기존 `_generate_custom_transformer()` 로직 이전, `_stream()`에 기존 단어 단위 가짜 스트리밍 로직을 `GenerationChunk` yield 형태로 이전 (§4.4, 표 3) | 기존 `generator.py` 관련 테스트 케이스 재사용 가능 여부 확인, `_stream()`이 단일 청크가 아닌 다중 청크로 yield하는지 검증 | 없음 |
+| 7 | `llm.py` (custom*transformer) | `LLM` 서브클래스 작성, `_call()`에 기존 `_generate_custom_transformer()` 로직 이전, `_stream()`에 기존 단어 단위 가짜 스트리밍 로직을 `GenerationChunk` yield 형태로 이전 (§4.4, 표 3) | 기존 `generator.py` 관련 테스트 케이스 재사용 가능 여부 확인, `_stream()`이 단일 청크가 아닌 다중 청크로 yield하는지 검증 | 없음 |
 | 8 | `chain.py` | 4·5·6·7의 결과를 LCEL로 조립 | `invoke()` 결과가 기존 `main.py` `/query` 응답과 동일한 형태인지 통합 검증 | 1–7 |
 | 9 | FastAPI 통합 (기존 `main.py`에 분기 추가, 표 1 #9) | `lifespan`에서 설정값(환경 변수 등)에 따라 `rag_pipeline` 체인 또는 `langchain_pipeline` 체인 중 하나를 생성, `/query`·`/query/stream`을 `chain.invoke()`/`chain.stream()`으로 교체 | 기존 엔드포인트 테스트에 분기 케이스 추가 | 8 |
+| 10 | `tests/evaluate/langsmith_eval.py` (`langchain_pipeline/`이 아니라 기존 `tests/evaluate/evaluate*_.py`와 같은 위치 — 평가 전용 모듈이라는 성격이 동일하고, 4개 평가 함수를 같은 디렉터리에서 직접 import) | LangSmith Tracing(env var 기반, 코드 변경 없음) + 골든 Dataset 업로드(`Client.create*dataset`/`create_examples`) + 기존 4개 평가 함수(`evaluate*_.py`)를 LangSmith evaluator 시그니처 `(inputs, outputs, reference_outputs)`로 래핑, `Client.evaluate()`로 실행 | `tests/evaluate/test_langsmith_eval.py` — 골든셋 구조·`target()` 출력 형태·4개 evaluator 어댑터의 입출력 매핑을 fake(가짜) client/judge로 검증. 실제 LangSmith 연결과 실제 모델 로딩은 단위 테스트 범위 밖(수동 실행) | 8 |
 
 1·3·5·6·7은 서로 독립이라 병렬로 진행할 수 있다. 4는 2·3 완료 후, 8은 1–7 모두 필요,
-9는 8 완료 후 진행한다.
+9·10은 8 완료 후 진행한다 (9와 10은 서로 독립).
 
 ## 7. 신규 의존성
 
@@ -207,11 +208,14 @@ RAG Chain에 가깝다. **결정(표 1 #7)**: `create_agent`를 거치지 않고
 | `langchain-community` | `TextLoader` |
 | `langchain-huggingface` | `HuggingFaceEmbeddings`, `HuggingFacePipeline` (기존 `sentence-transformers`/`transformers` 의존성과 함께 사용) |
 | `langchain` (메인 패키지) | `create_agent` 등 고수준 API. §5 결정(LCEL 직접 조립)에 따라 지금은 불필요 — 2차 확장 시 추가 |
+| `langsmith` | `Client`로 골든 Dataset 생성/업로드 및 `evaluate()` 실행 (§6 10단계). Tracing 자체는 코드 변경 없이 `LANGSMITH_TRACING` 등 env var로 활성화 |
 
 ## 8. 범위 제외 항목 (표 1 근거)
 
-GraphRAG(`graph_extractor.py`, `graph_retriever.py`), `tests/evaluate/*`의 RAGAS 스타일
-평가 코드, LangGraph, LangSmith는 모두 이번 마이그레이션 범위 밖이다 (표 1 #2, #4).
+GraphRAG(`graph_extractor.py`, `graph_retriever.py`)와 LangGraph는 이번 마이그레이션
+범위 밖이다 (표 1 #2). `tests/evaluate/*`의 기존 RAGAS 스타일 평가 코드는 `rag_pipeline`
+기준선용으로 그대로 보존하며 수정하지 않는다 — `langchain_pipeline`에 대한 신규 평가는
+LangSmith Tracing + Dataset 기반으로 별도 구현한다(표 1 #4, §6 10단계).
 
 ## 9. 결정 사항 요약
 
@@ -226,7 +230,13 @@ GraphRAG(`graph_extractor.py`, `graph_retriever.py`), `tests/evaluate/*`의 RAGA
 채택했고(표 1 #6), §4.4(스트리밍 동작)는 LangChain 공식 패턴(`_stream()` 오버라이드 +
 `GenerationChunk` yield)을 그대로 따르는 것으로 구현 방향을 확정했다(표 3).
 
-다음 단계는 표 5의 1단계(`loader.py`)부터 구현 코드와 테스트 코드를 함께 작성하는 것이다.
+- (e) 평가 코드 전환 범위: `langchain_pipeline`만 LangSmith로 평가한다(표 1 #4, §6 10단계).
+  데이터셋은 `data/00_Design_Specification.md`의 "RAG 검증용 핵심 정보(Verification
+  Anchors)" 표를 기반으로 한 신규 골든셋을 사용하고, 기존 `tests/evaluate/*`는
+  `rag_pipeline` 기준선용으로 그대로 보존한다(`rag_pipeline`은 평가 대상에서 제외).
+
+표 5의 1–9단계는 구현 코드와 테스트 코드를 함께 작성하는 방식으로 완료되었다.
+다음 단계는 10단계(`tests/evaluate/langsmith_eval.py`)를 동일한 방식으로 작성하는 것이다.
 
 ## 출처
 
@@ -242,3 +252,6 @@ GraphRAG(`graph_extractor.py`, `graph_retriever.py`), `tests/evaluate/*`의 RAGA
 - [HuggingFacePipeline 소스코드 (`_stream` 구현)](https://github.com/langchain-ai/langchain/blob/master/libs/partners/huggingface/langchain_huggingface/llms/huggingface_pipeline.py)
 - [DeterministicFakeEmbedding](https://reference.langchain.com/python/langchain-core/embeddings/fake/DeterministicFakeEmbedding)
 - [HuggingFace 통합 개요](https://docs.langchain.com/oss/python/integrations/providers/huggingface)
+- [LangSmith Tracing Quickstart (env var 기반 자동 계측)](https://docs.langchain.com/langsmith/observability-quickstart)
+- [Trace LangChain applications](https://docs.langchain.com/langsmith/trace-with-langchain)
+- [Evaluate an LLM application (Client.evaluate())](https://docs.langchain.com/langsmith/evaluate-llm-application)

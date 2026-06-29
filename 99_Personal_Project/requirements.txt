@@ -1,3 +1,4 @@
+dotenv
 fastapi
 uvicorn[standard]
 pydantic
@@ -12,3 +13,4 @@ langchain-core
 langchain-community
 langchain-text-splitters
 langchain-huggingface
+langsmith
