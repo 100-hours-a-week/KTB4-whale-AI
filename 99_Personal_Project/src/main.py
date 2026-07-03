@@ -52,6 +52,7 @@ from rag_pipeline.vector_store import InMemoryVectorStore
 # 기존 동작과 동일하게 유지하기 위한 의도적인 선택이다.
 RAG_BACKEND_ENV_VAR = "RAG_BACKEND"
 LANGCHAIN_BACKEND_VALUE = "langchain"
+LANGGRAPH_BACKEND_VALUE = "langgraph"
 
 # 서버 전체에서 공유할 리소스(모델, 저장소)를 담을 컨테이너.
 # 전역 변수를 직접 쓰는 대신 객체 하나에 묶어, 어떤 리소스들이 공유되는지 명확히 한다.
@@ -62,6 +63,11 @@ def _use_langchain_backend() -> bool:
     """RAG_BACKEND 환경 변수가 "langchain"이면 True. 테스트에서 직접 호출해 분기
     조건 자체도 검증한다."""
     return os.environ.get(RAG_BACKEND_ENV_VAR, "").strip().lower() == LANGCHAIN_BACKEND_VALUE
+
+
+def _use_langgraph_backend() -> bool:
+    """RAG_BACKEND 환경 변수가 "langgraph"이면 True."""
+    return os.environ.get(RAG_BACKEND_ENV_VAR, "").strip().lower() == LANGGRAPH_BACKEND_VALUE
 
 
 @asynccontextmanager
@@ -77,7 +83,24 @@ async def lifespan(app: FastAPI):
     """
     data_path = DATA_DIR / "daysync_manual.md"
 
-    if _use_langchain_backend():
+    if _use_langgraph_backend():
+        from langchain_pipeline.embedding import get_embeddings_model
+        from langchain_pipeline.llm import get_gemma_llm
+        from langchain_pipeline.loader import load_document as lc_load_document
+        from langchain_pipeline.splitter import split_fixed_size
+        from langchain_pipeline.vector_store import build_vector_store
+
+        lg_documents = lc_load_document(str(data_path))
+        lg_chunks = split_fixed_size(lg_documents, chunk_size=300, chunk_overlap=50)
+
+        embeddings_model = get_embeddings_model()
+        lg_store = build_vector_store(lg_chunks, embeddings_model)
+        lg_llm = get_gemma_llm()
+
+        resources["backend"] = "langgraph"
+        resources["lg_store"] = lg_store
+        resources["lg_llm"] = lg_llm
+    elif _use_langchain_backend():
         from langchain_pipeline.embedding import get_embeddings_model
         from langchain_pipeline.llm import get_gemma_llm
         from langchain_pipeline.loader import load_document as lc_load_document
@@ -153,6 +176,17 @@ def query(request: QueryRequest) -> QueryResponse:
     않고 LCEL 그래프(RunnableParallel 등 가벼운 Python 객체)만 새로 구성하므로,
     매 요청 호출에 따른 비용은 무시할 수 있는 수준이다.
     """
+    if resources.get("backend") == "langgraph":
+        from langgraph_pipeline.graph import build_rag_graph
+
+        graph = build_rag_graph(resources["lg_store"], resources["lg_llm"], k=request.k)
+        result = graph.invoke({"question": request.question, "retrieved": [], "answer": ""})
+        retrieved_chunks = [
+            RetrievedChunk(text=doc.page_content, score=score)
+            for doc, score in result["retrieved"]
+        ]
+        return QueryResponse(answer=result["answer"], retrieved_chunks=retrieved_chunks)
+
     if resources.get("backend") == "langchain":
         from langchain_pipeline.chain import build_rag_chain
 
@@ -193,6 +227,18 @@ def query_stream(request: QueryRequest) -> StreamingResponse:
     포함하지 않는다(8단계 chain.py 모듈 docstring에서 이미 확인한 기존 동작의
     의도된 비대칭).
     """
+    if resources.get("backend") == "langgraph":
+        from langgraph_pipeline.graph import stream_rag_answer
+
+        def event_stream() -> Iterator[str]:
+            for token in stream_rag_answer(
+                request.question, resources["lg_store"], resources["lg_llm"], k=request.k
+            ):
+                yield f"data: {token}\n\n"
+            yield "data: [DONE]\n\n"
+
+        return StreamingResponse(event_stream(), media_type="text/event-stream")
+
     if resources.get("backend") == "langchain":
         from langchain_pipeline.chain import build_answer_only_chain
 
@@ -226,8 +272,9 @@ def health() -> dict:
     """서버가 정상 동작 중인지, Indexing이 완료되었는지, 어느 백엔드가 활성화되어
     있는지 확인하는 간단한 헬스체크 엔드포인트."""
     backend = resources.get("backend", "rag_pipeline")
-    if backend == "langchain":
-        lc_store = resources.get("lc_store")
+    if backend in ("langchain", "langgraph"):
+        store_key = "lc_store" if backend == "langchain" else "lg_store"
+        lc_store = resources.get(store_key)
         # InMemoryVectorStore(langchain_core)는 len()을 직접 지원하지 않으므로,
         # 내부 딕셔너리(store.store)의 길이를 쓴다 — 4단계 test_vector_store.py에서
         # 이미 같은 방식으로 검증한 속성이다.
