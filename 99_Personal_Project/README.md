@@ -13,7 +13,7 @@
 ## 실행 방법
 
 ```bash
-python -m venv venv
+python -m venv .venv
 source .venv/bin/activate # 1. 가상환경 활성화
 pip install -r requirements.txt # 2. 의존성 설치
 uvicorn main:app --reload --port 8000 # 3. 서버 실행
@@ -39,6 +39,5 @@ uvicorn main:app --reload --port 8000 # 3. 서버 실행
     ├── langgraph_pipeline   # 4. LangGraph 파이프라인
     ├── debugs               # 진단 스크립트 (assert 없음)
     ├── evaluate             # 평가 로직 + 대응 테스트
-    ├── conftest.py          # pytest 공유 fixture 정의
     └── test_main.py         # FastAPI 엔드포인트 통합 테스트
 ```
