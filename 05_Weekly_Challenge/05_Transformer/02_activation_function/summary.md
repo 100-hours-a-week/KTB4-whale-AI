@@ -55,12 +55,25 @@ def backward(self, x: float, y_pred: float, y_true: float) -> tuple[float, float
 # After - 2단계(NeuronWithActivation)
 def backward(self, x1: float, x2: float, a: float, y_true: float) -> tuple[float, float, float]:
     error = a - y_true
+
+    # (w1) dL/dw1 = dL/da * da/dz * dz/dw1
     dL_da = 2 * error
-    da_dz = a * (1 - a)          # sigmoid 미분: activation을 거치며 새로 추가된 chain rule 항
-    dL_dz = dL_da * da_dz
-    dL_dw1 = dL_dz * x1
-    dL_dw2 = dL_dz * x2
-    dL_db = dL_dz * 1
+    da_dz = a * (1 - a)  # sigmoid_derivative(z)를 a로부터 바로 계산 (효율적)
+    dz_dw1 = x1
+    dL_dw1 = dL_da * da_dz * dz_dw1
+
+    # (w2) dL/dw2 = dL/da * da/dz * dz/dw2
+    dL_da = 2 * error
+    da_dz = a * (1 - a)
+    dz_dw2 = x2
+    dL_dw2 = dL_da * da_dz * dz_dw2
+
+    # (bias) dL/db  = dL/da * da/dz * dz/db
+    dL_da = 2 * error
+    da_dz = a * (1 - a)
+    dz_db = 1
+    dL_db = dL_da * da_dz * dz_db
+
     return dL_dw1, dL_dw2, dL_db
 ```
 

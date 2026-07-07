@@ -63,14 +63,24 @@ class NeuronWithActivation:
             (dL_dw1, dL_dw2, dL_db)
         """
         error = a - y_true
+
+        # (w1) dL/dw1 = dL/da * da/dz * dz/dw1
         dL_da = 2 * error
         da_dz = a * (1 - a)  # sigmoid_derivative(z)를 a로부터 바로 계산 (효율적)
+        dz_dw1 = x1
+        dL_dw1 = dL_da * da_dz * dz_dw1
 
-        dL_dz = dL_da * da_dz  # 이후 dz/dw1, dz/dw2, dz/db에 공통으로 곱해지는 부분
+        # (w2) dL/dw2 = dL/da * da/dz * dz/dw2
+        dL_da = 2 * error
+        da_dz = a * (1 - a)
+        dz_dw2 = x2
+        dL_dw2 = dL_da * da_dz * dz_dw2
 
-        dL_dw1 = dL_dz * x1
-        dL_dw2 = dL_dz * x2
-        dL_db = dL_dz * 1
+        # (bias) dL/db  = dL/da * da/dz * dz/db
+        dL_da = 2 * error
+        da_dz = a * (1 - a)
+        dz_db = 1
+        dL_db = dL_da * da_dz * dz_db
 
         return dL_dw1, dL_dw2, dL_db
 
