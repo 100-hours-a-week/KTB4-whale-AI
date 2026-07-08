@@ -37,7 +37,7 @@ class ScaledDotProductAttention:
                     A를 함께 반환하는 이유는, "각 위치가 다른 위치를 얼마나 참조했는지"를
                     직접 눈으로 확인하기 위함이다 (7단계의 S와 달리, 이제 합이 1인 가중치다).
         """
-        X_val = NumpyValue(X)
+        X_val = X if isinstance(X, NumpyValue) else NumpyValue(X)
         Q = X_val @ self.Wq
         K = X_val @ self.Wk
         V = X_val @ self.Wv
