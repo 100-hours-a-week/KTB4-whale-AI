@@ -10,7 +10,7 @@ MLP 검증.
 """
 
 from mlp import MLP, train, AND_DATA, XOR_DATA
-from activation import sigmoid
+from step_02_activation_function.activation import sigmoid
 
 
 def numerical_gradient_for_param(mlp: MLP, x1: float, x2: float, y_true: float,
