@@ -93,6 +93,31 @@ class NumpyValue:
         out._backward = _backward
         return out
 
+    def softmax(self, axis: int = -1):
+        """
+        softmax(x_i) = e^(x_i) / sum_j(e^(x_j))   (axis 방향으로 정규화)
+
+        지금까지의 sigmoid, transpose와 달리, softmax는 한 행(row) 안의
+        모든 원소가 서로 영향을 주는 연산이다 -- 원소 하나를 바꾸면 그 행의
+        나머지 원소들의 정규화 결과도 함께 바뀐다. 그래서 backward도
+        원소별(element-wise)이 아니라 행 전체를 고려해서 계산해야 한다.
+
+        backward 공식 (softmax의 Jacobian-vector product):
+            dL/dx_i = y_i * (dL/dy_i - sum_j(dL/dy_j * y_j))
+            (y = softmax(x), 같은 행 안에서 계산)
+        """
+        shifted = self.data - np.max(self.data, axis=axis, keepdims=True)  # overflow 방지
+        exp = np.exp(shifted)
+        y = exp / np.sum(exp, axis=axis, keepdims=True)
+
+        out = NumpyValue(y, (self,), 'softmax')
+
+        def _backward():
+            weighted_sum = np.sum(out.grad * y, axis=axis, keepdims=True)
+            self.grad += y * (out.grad - weighted_sum)
+        out._backward = _backward
+        return out
+
     def sum(self):
         """배치 전체의 loss를 스칼라 하나로 합산할 때 필요"""
         out = NumpyValue(self.data.sum(), (self,), 'sum')
