@@ -84,6 +84,15 @@ class NumpyValue:
         out._backward = _backward
         return out
 
+    def transpose(self):
+        """전치(transpose). backward는 gradient도 함께 전치해서 되돌려주면 된다."""
+        out = NumpyValue(self.data.T, (self,), 'transpose')
+
+        def _backward():
+            self.grad += out.grad.T
+        out._backward = _backward
+        return out
+
     def sum(self):
         """배치 전체의 loss를 스칼라 하나로 합산할 때 필요"""
         out = NumpyValue(self.data.sum(), (self,), 'sum')
@@ -124,7 +133,7 @@ class NumpyValue:
             node._backward()
 
     def __repr__(self):
-        return f"TensorValue(shape={self.data.shape}, data={self.data})"
+        return f"NumpyValue(shape={self.data.shape}, data={self.data})"
 
 
 def _unbroadcast(grad, target_shape):
