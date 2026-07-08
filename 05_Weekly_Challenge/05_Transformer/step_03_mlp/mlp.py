@@ -15,7 +15,7 @@ backward의 핵심 차이:
 """
 
 import random
-from activation import sigmoid
+from step_02_activation_function.activation import sigmoid
 
 
 class Neuron:

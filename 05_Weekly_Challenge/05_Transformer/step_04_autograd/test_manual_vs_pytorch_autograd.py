@@ -6,12 +6,9 @@ PyTorch가 라이브러리 내부에서 하는 일이, 우리가 value.py에 구
 원리적으로 동일하다는 것(연산자 오버로딩 + 계산 그래프 역순 순회)을 확인하는 게 목적이다.
 """
 
-import sys
-import os
 import torch
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'step3_mlp'))
-from mlp import MLP as ManualMLP
+from step_03_mlp.mlp import MLP as ManualMLP
 
 
 def test_pytorch_matches_manual_backward():

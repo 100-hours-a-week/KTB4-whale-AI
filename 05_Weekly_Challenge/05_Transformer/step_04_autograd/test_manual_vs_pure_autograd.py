@@ -6,12 +6,7 @@
 동일하다는 것이 증명되고, 4단계에서 autograd로 전환해도 안전하다는 근거가 된다.
 """
 
-import sys
-import os
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'step3_mlp'))
-
-from mlp import MLP as ManualMLP
+from step_03_mlp.mlp import MLP as ManualMLP
 from mlp_pure_autograd import MLP as AutogradMLP
 
 
