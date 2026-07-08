@@ -118,6 +118,29 @@ class NumpyValue:
         out._backward = _backward
         return out
 
+    @staticmethod
+    def concat(values: list, axis: int = -1):
+        """
+        여러 NumpyValue를 axis 방향으로 이어 붙인다.
+        multi-head attention에서 각 head의 출력을 하나로 합칠 때 사용한다.
+
+        backward는 반대로, 이어 붙여진 gradient를 원래 조각들의 크기만큼 잘라서
+        각자에게 되돌려주면 된다.
+        """
+        sizes = [v.data.shape[axis] for v in values]
+        out_data = np.concatenate([v.data for v in values], axis=axis)
+        out = NumpyValue(out_data, tuple(values), 'concat')
+
+        def _backward():
+            offset = 0
+            for v, size in zip(values, sizes):
+                slicer = [slice(None)] * out.grad.ndim
+                slicer[axis] = slice(offset, offset + size)
+                v.grad += out.grad[tuple(slicer)]
+                offset += size
+        out._backward = _backward
+        return out
+
     def sum(self):
         """배치 전체의 loss를 스칼라 하나로 합산할 때 필요"""
         out = NumpyValue(self.data.sum(), (self,), 'sum')
