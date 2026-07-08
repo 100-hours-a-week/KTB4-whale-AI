@@ -93,6 +93,48 @@ class NumpyValue:
         out._backward = _backward
         return out
 
+    def mean(self, axis: int = -1, keepdims: bool = True):
+        """
+        axis 방향의 평균. LayerNorm이 "각 위치(행)마다 feature 축 평균"을
+        구하는 데 필요하다.
+
+        mean = sum / n 이므로, sum의 backward(모든 원소에 동일하게 분배)에
+        1/n을 추가로 곱하는 것과 같다.
+        """
+        n = self.data.shape[axis]
+        m = np.mean(self.data, axis=axis, keepdims=keepdims)
+        out = NumpyValue(m, (self,), 'mean')
+
+        def _backward():
+            grad = out.grad
+            if not keepdims:
+                grad = np.expand_dims(grad, axis=axis)
+            self.grad += np.ones_like(self.data) * grad / n
+        out._backward = _backward
+        return out
+
+    def sqrt(self):
+        """제곱근. d(sqrt(x))/dx = 1/(2*sqrt(x))"""
+        s = np.sqrt(self.data)
+        out = NumpyValue(s, (self,), 'sqrt')
+
+        def _backward():
+            self.grad += (0.5 / s) * out.grad
+        out._backward = _backward
+        return out
+
+    def __truediv__(self, other):
+        """나눗셈. self * (1/other)로 처리하되, other가 0에 가까울 때를 대비해
+        직접 나눗셈 backward를 정의한다 (역수의 미분보다 수치적으로 안정적)."""
+        other = other if isinstance(other, NumpyValue) else NumpyValue(other)
+        out = NumpyValue(self.data / other.data, (self, other), '/')
+
+        def _backward():
+            self.grad += _unbroadcast(out.grad / other.data, self.data.shape)
+            other.grad += _unbroadcast(-out.grad * self.data / (other.data ** 2), other.data.shape)
+        out._backward = _backward
+        return out
+
     def softmax(self, axis: int = -1):
         """
         softmax(x_i) = e^(x_i) / sum_j(e^(x_j))   (axis 방향으로 정규화)
