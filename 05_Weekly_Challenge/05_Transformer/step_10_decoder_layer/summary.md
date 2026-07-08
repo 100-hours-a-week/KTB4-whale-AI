@@ -8,7 +8,7 @@
 
 ## 동작 원리
 
-### 세 개념 요약 (forward 코드에 앞서)
+### 관련 개념 요약
 
 **positional encoding (위치 인코딩)**
 

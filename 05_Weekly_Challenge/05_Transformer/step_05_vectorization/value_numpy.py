@@ -192,6 +192,21 @@ class NumpyValue:
         out._backward = _backward
         return out
 
+    def relu(self):
+        """
+        ReLU(x) = max(0, x)   -- FFN에서 쓰는 비선형 activation.
+
+        backward: x>0인 지점은 기울기 1을 그대로 통과, x<=0인 지점은 0
+        (그 지점은 출력에 전혀 기여하지 않았으므로 gradient도 안 흐름).
+        """
+        mask = (self.data > 0).astype(np.float64)
+        out = NumpyValue(self.data * mask, (self,), 'relu')
+
+        def _backward():
+            self.grad += mask * out.grad
+        out._backward = _backward
+        return out
+
     def sigmoid(self):
         s = 1 / (1 + np.exp(-self.data))
         out = NumpyValue(s, (self,), 'sigmoid')
