@@ -89,3 +89,64 @@
 
 - 관리 편의성(메모리 완전 초기화)과 구현 공수(전달 코드 추가) 사이의 트레이드오프를 판단할 때, 현재 시점에 실제로 발생한 문제가 아니라면 더 단순한 구조를 먼저 선택하고 필요 시 확장하는 접근이 효율적임
 - `import json`처럼, 검토 과정에서 논의됐던 방식(분리 구조)의 흔적이 최종 결정(단일 파일)과 맞지 않는 코드로 남는 경우가 있으므로, 방향 전환 시 관련 코드를 함께 정리하는 습관이 필요함
+
+## 트러블 슈팅 4 - 실행 환경 불일치로 인한 device 분기 및 Empty Cache 오류
+
+- 이 트러블 슈팅은 단순한 코드 오류가 아니라, 로컬(Mac M3) 환경을 전제로 작성한 코드가 실제 실행 환경(Colab, CUDA)과 달라 발생한 문제를 기록한 내용
+
+### 문제 상황
+
+- 0-1 실행 결과 device가 `cpu`로 확인됨. 실제 실행 환경은 VSCode에서 Colab으로 원격 연결한 GPU(T4) 런타임이었음
+- 0-5(Empty Cache) 실행 시 아래 에러 발생
+
+  ```
+  RuntimeError: Cannot execute emptyCache() without MPS backend.
+  ```
+
+### 원인 분석
+
+- 기존 device 분기 코드가 MPS(Mac 전용) 여부만 확인하고, CUDA 여부는 확인하지 않는 구조였음
+
+```python
+device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+```
+
+- 이 코드는 이전 대화에서 로컬 Mac M3 환경을 전제로 작성된 것이며, 실행 환경이 Colab(CUDA)으로 바뀌었다는 정보가 이번에 처음 공유됨
+- Empty Cache 코드 역시 동일한 이유로 MPS 전용 함수를 무조건 호출하도록 작성되어 있었음
+
+```python
+torch.mps.empty_cache()
+```
+
+- 즉 두 문제 모두 "코드 로직 자체의 결함"이 아니라, 전제한 실행 환경과 실제 실행 환경이 일치하지 않아서 발생한 문제였음
+
+### 결정 및 대응
+
+- device 분기를 CUDA → MPS → CPU 순서로 확인하도록 수정
+
+```python
+if torch.cuda.is_available():
+    device = torch.device("cuda")
+elif torch.backends.mps.is_available():
+    device = torch.device("mps")
+else:
+    device = torch.device("cpu")
+```
+
+- Empty Cache도 동일한 우선순위로 조건부 처리하는 함수로 분리
+
+```python
+def empty_device_cache():
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    elif torch.backends.mps.is_available():
+        torch.mps.empty_cache()
+```
+
+- 수정 후 재실행 결과, device가 `cuda`로 정상 확인됨. latency 역시 23.39초 → 2.10초로 개선되어, 이전 수치가 GPU 미인식 상태에서 측정된 값이었음을 간접적으로 확인함
+
+### 인사이트
+
+- 코드를 작성할 때 전제한 실행 환경(로컬 Mac M3)과 실제 작업이 이루어지는 실행 환경(Colab, CUDA)이 다를 수 있다는 점을 놓쳤음
+- 성능 지표(latency)가 비정상적으로 느리게 나올 때, 코드 로직 오류를 먼저 의심하기보다 **device가 실제로 의도한 하드웨어를 타고 있는지**부터 확인하는 것이 더 빠른 원인 파악 경로가 될 수 있음 — `print(device)`, `print(next(model.parameters()).device)` 같은 간단한 확인 코드를 초기 셀에 상시 배치하는 습관이 필요함
+- 여러 실행 환경(로컬, Colab 등)을 오갈 가능성이 있는 프로젝트라면, 하드웨어 종속적인 코드(device 분기, cache 해제 등)는 처음부터 다중 환경을 고려한 조건부 구조로 작성하는 것이 재작업을 줄이는 방법임
