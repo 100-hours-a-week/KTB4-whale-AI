@@ -150,3 +150,45 @@ def empty_device_cache():
 - 코드를 작성할 때 전제한 실행 환경(로컬 Mac M3)과 실제 작업이 이루어지는 실행 환경(Colab, CUDA)이 다를 수 있다는 점을 놓쳤음
 - 성능 지표(latency)가 비정상적으로 느리게 나올 때, 코드 로직 오류를 먼저 의심하기보다 **device가 실제로 의도한 하드웨어를 타고 있는지**부터 확인하는 것이 더 빠른 원인 파악 경로가 될 수 있음 — `print(device)`, `print(next(model.parameters()).device)` 같은 간단한 확인 코드를 초기 셀에 상시 배치하는 습관이 필요함
 - 여러 실행 환경(로컬, Colab 등)을 오갈 가능성이 있는 프로젝트라면, 하드웨어 종속적인 코드(device 분기, cache 해제 등)는 처음부터 다중 환경을 고려한 조건부 구조로 작성하는 것이 재작업을 줄이는 방법임
+
+## 트러블 슈팅 5 - 라이브러리 버전 불일치로 인한 반복적 ImportError
+
+- 이 트러블 슈팅은 단일 오류가 아니라, 동일 원인(Colab 기본 환경의 구버전 라이브러리)이 서로 다른 두 라이브러리(torchao, bitsandbytes)에서 반복적으로 나타난 패턴을 기록한 내용
+
+### 문제 상황
+
+- 1-2(LoRA) 실행 중 `get_peft_model` 호출 시 아래 에러 발생
+
+```
+ImportError: Found an incompatible version of torchao. Found version 0.10.0,
+but only versions above 0.16.0 are supported
+```
+
+- torchao 업그레이드 후 1-2는 정상 동작했으나, 1-3(QLoRA) 실행 중 `BitsAndBytesConfig` 사용 시 유사한 에러 재발
+
+```
+ImportError: Using bitsandbytes 4-bit quantization requires bitsandbytes: pip install -U bitsandbytes>=0.46.1
+```
+
+- bitsandbytes를 pip으로 재설치했음에도 동일 에러가 한 번 더 발생
+
+### 원인 분석
+
+- 두 에러 모두 근본 원인은 동일함: Colab 기본 이미지에 사전 설치된 라이브러리 버전이, 현재 사용 중인 `peft`/`transformers` 버전이 요구하는 최소 버전보다 낮았음
+  - torchao: 설치된 버전 0.10.0 < 요구 버전 0.16.0
+  - bitsandbytes: 최초 미충족 상태 → 요구 버전 0.46.1 이상 필요
+- bitsandbytes의 경우, pip install 로그상 `0.49.2`가 이미 만족된 상태(`Requirement already satisfied`)로 나왔음에도 동일 ImportError가 재발함
+  - 원인은 **커널 재시작 누락**으로 판단됨. pip install은 파일 시스템에 새 버전을 설치하지만, 이미 실행 중인 Python 프로세스(Jupyter 커널)는 이전 시점에 import된 모듈 상태를 그대로 유지하고 있어, 재설치가 실제 실행 환경에 반영되지 않음
+  - torchao 업그레이드 시에는 우연히(혹은 인지하지 못한 채) 재시작이 이루어져 정상 반영되었으나, bitsandbytes 때는 재시작 없이 재실행하여 동일 문제가 재현됨
+
+### 결정 및 대응
+
+- `!pip install -U torchao bitsandbytes --break-system-packages` 형태로 필요한 라이브러리를 한 번에 업그레이드
+- 설치 후 반드시 **커널 재시작**을 거친 뒤 0-1부터 순서대로 재실행
+- 향후 유사 문제를 앞단에서 예방하기 위해, 노트북 최상단(0-1 이전)에 환경 의존성 설치 셀("0-0")을 별도로 두는 방향을 고려함
+
+### 인사이트
+
+- pip install 로그에 `Successfully installed` 또는 `Requirement already satisfied`가 찍혀도, 그것이 곧바로 "현재 실행 중인 커널에 반영되었다"는 의미는 아님 — 설치와 반영은 별개의 단계이며, 반영을 위해서는 커널 재시작이 필요함
+- 동일한 유형의 에러(라이브러리 버전 불일치)가 반복될 경우, 매번 개별적으로 대응하기보다 노트북 실행 초입에 의존성 설치 및 버전 고정을 한 번에 처리하는 구조가 반복 작업을 줄이는 방법이 됨
+- Colab처럼 기본 이미지에 다양한 라이브러리가 사전 설치된 환경에서는, 최신 `transformers`/`peft` 기능을 쓰기 전에 관련 하위 의존성(quantization 관련 라이브러리)의 버전을 먼저 확인하는 습관이 필요함
