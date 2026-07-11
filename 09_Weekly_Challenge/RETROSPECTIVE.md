@@ -192,3 +192,74 @@ ImportError: Using bitsandbytes 4-bit quantization requires bitsandbytes: pip in
 - pip install 로그에 `Successfully installed` 또는 `Requirement already satisfied`가 찍혀도, 그것이 곧바로 "현재 실행 중인 커널에 반영되었다"는 의미는 아님 — 설치와 반영은 별개의 단계이며, 반영을 위해서는 커널 재시작이 필요함
 - 동일한 유형의 에러(라이브러리 버전 불일치)가 반복될 경우, 매번 개별적으로 대응하기보다 노트북 실행 초입에 의존성 설치 및 버전 고정을 한 번에 처리하는 구조가 반복 작업을 줄이는 방법이 됨
 - Colab처럼 기본 이미지에 다양한 라이브러리가 사전 설치된 환경에서는, 최신 `transformers`/`peft` 기능을 쓰기 전에 관련 하위 의존성(quantization 관련 라이브러리)의 버전을 먼저 확인하는 습관이 필요함
+
+## 트러블 슈팅 6 - Adapter Merge 실행 시점 재배치 (Phase 3 → Phase 2)
+
+### 문제 상황
+
+- 로드맵 설계 당시, Adapter Merge는 Phase 3(GGUF 변환 및 llama.cpp 추론)의 첫 단계(3-1)로 계획되어 있었음
+- 그러나 Phase 2(PTQ)를 bitsandbytes 4-bit(NF4)로 진행하기로 확정하면서, 이 방식이 이미 메모리에 로드된 모델을 사후 변환하는 게 아니라 `from_pretrained` 호출 시점에 `quantization_config`를 지정해야만 적용된다는 제약이 드러남
+- Phase 1의 LoRA 결과물은 base_model과 adapter가 분리된 `PeftModel` 상태라, 이 상태로는 `from_pretrained`로 다시 불러와 양자화할 단일 체크포인트가 존재하지 않는다는 문제가 확인됨
+
+### 고려한 옵션
+
+**고려 옵션**
+| 옵션 | 내용 | 장점 | 단점 |
+|---|---|---|---|
+| 기존 계획 유지 | Adapter Merge를 Phase 3에서 그대로 진행 | 로드맵 변경 없음 | PTQ(Phase 2) 자체가 병합된 단일 체크포인트를 요구하므로 실행 불가능 |
+| **재배치** | Adapter Merge를 Phase 2 초입(2-3-1)으로 이동, 병합된 모델을 그대로 PTQ 입력으로 사용 | PTQ 실행 가능, 이후 Phase 3은 이미 병합된 모델을 그대로 이어받음 | 로드맵 목차와 실제 실행 순서가 달라짐 |
+
+### 결정 및 이유
+
+- 최종 결정: Adapter Merge를 Phase 2(2-3-1)로 재배치
+- 선택 이유:
+  - PTQ 실행 자체가 병합된 단일 체크포인트를 선행 조건으로 요구하므로, 이 제약을 따르지 않으면 Phase 2 진행이 불가능함
+  - Phase 3-1("Adapter Merge 여부 결정 및 실행")은 이미 Phase 2에서 병합이 완료된 상태이므로, 실질적으로 "병합된 모델임을 확인"하는 수준으로 축소됨
+
+### 인사이트
+
+- 로드맵 목차 작성 시점에는 각 Phase의 작업 단위를 개념적으로 나눴으나, 실제 구현에 들어가면 특정 기법(bitsandbytes 4-bit 등)의 API 제약이 Phase 간 순서를 강제하는 경우가 있음
+- "이 작업은 다음 Phase에서 하기로 했다"는 계획이 있어도, 뒤 Phase가 실제로 무엇을 입력값으로 요구하는지 구현 직전에 재확인해야 하며, 필요하면 목차 자체를 유연하게 조정하는 것이 실행 가능한 순서를 유지하는 데 더 중요함
+
+---
+
+## 트러블 슈팅 7 - Phase 간 객체 재사용을 고려하지 않은 Empty Cache 설계
+
+### 문제 상황
+
+- 트러블 슈팅 6에 따라 Adapter Merge를 Phase 2(2-3-1)로 옮겨 진행하려는 시점에 아래 에러 발생
+
+```
+NameError: name 'lora_model' is not defined
+```
+
+- 원인은 Phase 1의 LoRA 학습 직후(1-2-5, Empty Cache)에서 실행한 아래 코드였음
+
+```python
+del lora_base_model, lora_model, lora_trainer
+gc.collect()
+empty_device_cache()
+```
+
+### 원인 분석
+
+- 1-2-5 작성 당시에는 "Phase 1이 끝나면 LoRA 결과물을 더 이상 참조하지 않는다"는 전제로 `lora_model`까지 포함해 전부 삭제하도록 설계함
+- 그러나 트러블 슈팅 6에서 확인된 대로, Adapter Merge가 Phase 2로 앞당겨지면서 `lora_model`을 Phase 2에서 다시 참조해야 하는 상황이 됨
+- 즉 "해당 Phase가 끝났으니 여기서 만든 객체는 모두 지운다"는 단순 규칙으로 empty cache를 설계한 것이, 실제로는 이후 Phase가 이 객체를 입력으로 요구한다는 점을 반영하지 못한 것이 원인
+
+### 결정 및 대응
+
+- 1-2-5(LoRA Empty Cache)에서 `lora_model`은 삭제 대상에서 제외하고, 메모리 부담이 큰 `lora_base_model`, `lora_trainer`만 정리하도록 수정
+
+```python
+del lora_base_model, lora_trainer
+gc.collect()
+empty_device_cache()
+```
+
+- `qlora_model`은 이번 챌린지에서 다음 Phase로 선택되지 않았으므로 기존 삭제 코드를 유지하되, 추후 재참조가 필요해지면 동일한 방식으로 재검토하기로 함
+
+### 인사이트
+
+- 메모리 해제 코드는 "이번 Phase가 끝났다"는 시점 기준이 아니라, 전체 파이프라인에서 해당 객체가 이후 몇 단계까지 참조되는지를 먼저 확인하고 삭제 범위를 정해야 함
+- 트러블 슈팅 6(Adapter Merge 재배치)과 이 문제는 같은 원인(로드맵상 계획과 실제 의존관계의 불일치)에서 파생된 연쇄적 결과이며, 상위 결정(작업 순서 변경)이 하위 구현(메모리 관리 코드)에도 영향을 미친다는 것을 보여주는 사례임
