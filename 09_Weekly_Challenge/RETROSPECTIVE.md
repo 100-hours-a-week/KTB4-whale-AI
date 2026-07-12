@@ -458,3 +458,80 @@ E perplexity: the data file you provided tokenizes to only 383 tokens
 
 - 동일한 이름(perplexity)의 지표라도, 측정 도구가 다르면 계산 방식(개별 문장 평균 vs 슬라이딩 윈도우 연속 평가)이 달라 절대값을 직접 비교할 수 없는 경우가 있음 — 지표 이름만 보고 동일 선상에서 비교하면 잘못된 결론(예: "GGUF가 압도적으로 우수하다")에 이를 수 있음
 - 도구가 요구하는 최소 조건(이번 경우 최소 토큰 수)을 데이터 크기에 맞추는 것과, 데이터를 도구의 요구치에 맞춰 늘리는 것 중 무엇이 더 타당한 선택인지는 상황에 따라 다르며, 이번에는 평가 데이터의 원본 의미를 훼손하지 않는 전자(context 축소)를 선택함
+
+---
+
+## 트러블 슈팅 14 - QLoRA 표준 구성에서 Double Quantization 누락
+
+### 문제 상황
+
+- Phase 1(1-3-1)에서 QLoRA를 구현할 때 사용한 `BitsAndBytesConfig`에 `bnb_4bit_use_double_quant`가 지정되지 않음
+
+```python
+bnb_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_quant_type="nf4",
+    bnb_4bit_compute_dtype=torch.bfloat16
+)
+```
+
+- 이 설정이 Phase 2(2-3-2, PTQ)에서도 그대로 재사용되어, PTQ 단계 역시 Double Quantization 없이 진행됨
+- 결과적으로 최종 정리 표 1에서 PTQ의 memory 절감폭이 이론적 최대치(1/4)에 못 미쳤던 원인(quantization constant 저장 오버헤드) 중 일부가 이 누락에서 비롯되었을 가능성이 확인됨
+
+### 원인 분석
+
+- QLoRA 논문에서 권장하는 표준 구성은 NF4 + Double Quantization + bfloat16 compute dtype의 조합이었으나, Phase 1의 QLoRA 구현 시점(1-3-1)에 이 옵션 자체를 검토하지 못하고 누락함 — 다만 QLoRA는 Phase 1에서 최종 선택되지 않았으므로(LoRA가 선택됨), 이 누락은 Phase 2와 직접적인 인과관계가 없음
+- Phase 2(2-3-2)의 PTQ는 QLoRA와 무관하게, 병합된 LoRA 결과물(merged_lora_model)을 대상으로 별도로 `BitsAndBytesConfig`를 새로 작성해 진행됨
+- 이 과정에서도 동일하게 `bnb_4bit_use_double_quant` 옵션이 검토되지 않고 누락됨 — 즉 Phase 1과 Phase 2에서 서로 무관하게 작성된 두 코드에서, 같은 종류의 검토 누락이 독립적으로 두 번 발생한 것
+
+### 결정 및 대응
+
+- Double Quantization 반영 여부를 결정 검증 항목으로 별도 등재하고, 추후 과제로 남김
+
+```python
+ptq_bnb_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_quant_type="nf4",
+    bnb_4bit_compute_dtype=torch.bfloat16,
+    bnb_4bit_use_double_quant=True  # 추후 반영 시 추가할 옵션
+)
+```
+
+- 이번 챌린지에서는 즉시 재실행하지 않고, memory 절감폭을 재비교할 향후 과제로 분리함
+
+### 인사이트
+
+- 기본값이 `False`인 옵션은 명시적으로 켜지 않아도 에러 없이 조용히 넘어가기 때문에, "표준 구성을 따랐는지"가 실행 결과만으로는 드러나지 않음
+- 서로 다른 Phase에서 관련 없이 독립적으로 작성된 코드임에도 동일한 누락이 반복되었다는 것은, 코드 재사용 여부와 무관하게 애초에 "이 양자화 방식에서 검토해야 할 표준 옵션 목록" 자체가 사전에 정리되어 있지 않았다는 게 더 근본적인 원인임을 시사함
+
+---
+
+## 트러블 슈팅 15 - Double Quantization과 QLoRA 정의의 혼동
+
+### 문제 상황
+
+- 트러블 슈팅 14를 확인하는 과정에서, "Phase 2(PTQ)에 Double Quantization을 적용하면 LoRA가 QLoRA로 바뀌는 것 아닌가"라는 의문이 제기됨
+- 즉 Double Quantization의 적용 여부가 QLoRA를 QLoRA이게 만드는 정의 조건 중 하나인지, 아니면 QLoRA와 무관하게 켤 수 있는 부가 옵션인지 불명확했음
+
+### 원인 분석
+
+- QLoRA의 정의(자료 기준: "4-bit NF4로 양자화된 기반 모델은 고정하고, 16-bit LoRA 어댑터만 학습해 메모리 사용량을 줄이는 PEFT 기법")를 분해하면 핵심 조건은 다음과 같음
+  1. 기반 모델이 **학습이 시작되기 전에 이미** 4-bit NF4로 양자화되어 있어야 함
+  2. 그 양자화된 기반 모델은 고정(freeze)
+  3. LoRA adapter만 16-bit로 학습
+- 이 세 조건 중 어디에도 Double Quantization은 필수 조건으로 명시되어 있지 않음 — Double Quantization은 "4-bit 양자화를 적용할 때 quantization constant까지 추가로 압축해 메모리를 더 아끼는" 부가적인 세부 구현 옵션일 뿐, QLoRA만의 전유물이 아니며 순수 PTQ에도 독립적으로 적용 가능함
+- 반면 LoRA와 QLoRA를 실제로 가르는 것은 "**언제** 양자화가 개입하는가"임
+  - LoRA: bfloat16 기반 모델 위에서 학습 (양자화 없음)
+  - QLoRA: 이미 4-bit로 양자화된 기반 모델 위에서 학습 (학습 시점에 양자화가 전제됨)
+- Phase 2의 PTQ는 이미 fine-tuning이 끝난 LoRA 결과물을 **사후에** 4-bit로 변환하는 것이므로, 여기에 Double Quantization을 추가해도 "학습 시점에 양자화된 상태"라는 QLoRA의 조건 자체를 충족시키지 못함 — 즉 Double Quantization을 켜더라도 이는 여전히 PTQ이지 QLoRA로 전환되는 것이 아님
+
+### 결정 및 대응
+
+- Double Quantization은 QLoRA 여부와 독립적인 옵션으로 취급하기로 함 — Phase 2(PTQ)에 이 옵션을 추가로 켜더라도, 이는 PTQ의 메모리 효율을 개선하는 조치일 뿐 Fine-Tuning 단계의 선택(LoRA vs QLoRA)을 소급해서 바꾸는 것이 아님을 확인
+- 트러블 슈팅 14의 결정 검증 항목은 "PTQ의 memory 효율 개선 여부"로만 좁혀서 유지하고, "LoRA를 QLoRA로 바꾸는 것"이라는 오해는 배제함
+
+### 인사이트
+
+- 두 기법(QLoRA)의 이름과, 그 기법에 흔히 함께 등장하는 부가 최적화 옵션(Double Quantization)을 혼동하기 쉬움 — "A 기법에서 자주 쓰이는 옵션 B"가 "A 기법의 정의 조건"과 반드시 같지는 않음
+- 기법을 정의하는 핵심 조건(이번 경우 "학습 시점에 양자화가 이미 적용되어 있는가")과, 그 기법을 더 효율적으로 만드는 부수적 구현 디테일을 구분해서 이해하는 것이, 유사한 개념들이 얽혀 있는 최적화 분야에서 특히 중요함
+- "이 옵션을 켜면 다른 기법이 되는가"라는 질문이 떠오를 때는, 그 기법의 정의를 조건 단위로 다시 분해해서, 해당 옵션이 그 조건들 중 하나에 해당하는지 직접 대조해보는 것이 혼동을 해소하는 가장 확실한 방법임
