@@ -28,4 +28,11 @@
 
 - 7주차 위클리 챌린지
   - [가이드 바로가기](./07_Weekly_Challenge/README.md)
-  - [회고록 바로가기](./07_Weekly_Challenge/RESTROSPECTIVE.md)
+  - [회고록 바로가기](./07_Weekly_Challenge/RETROSPECTIVE.md)
+
+- 8주차 위클리 챌린지
+  - [가이드 바로가기](./08_Weekly_Challenge/README.md)
+
+- 9주차 위클리 챌린지
+  - [가이드 바로가기](./09_Weekly_Challenge/README.md)
+  - [회고록 바로가기](./09_Weekly_Challenge/RETROSPECTIVE.md)
