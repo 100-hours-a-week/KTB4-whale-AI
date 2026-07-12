@@ -461,7 +461,7 @@ E perplexity: the data file you provided tokenizes to only 383 tokens
 
 ---
 
-## 트러블 슈팅 14 - QLoRA 표준 구성에서 Double Quantization 누락
+## 트러블 슈팅 14 - NF4 양자화 구성에서 Double Quantization 누락 (QLoRA, PTQ 공통)
 
 ### 문제 상황
 
@@ -480,9 +480,11 @@ bnb_config = BitsAndBytesConfig(
 
 ### 원인 분석
 
-- QLoRA 논문에서 권장하는 표준 구성은 NF4 + Double Quantization + bfloat16 compute dtype의 조합이었으나, Phase 1의 QLoRA 구현 시점(1-3-1)에 이 옵션 자체를 검토하지 못하고 누락함 — 다만 QLoRA는 Phase 1에서 최종 선택되지 않았으므로(LoRA가 선택됨), 이 누락은 Phase 2와 직접적인 인과관계가 없음
-- Phase 2(2-3-2)의 PTQ는 QLoRA와 무관하게, 병합된 LoRA 결과물(merged_lora_model)을 대상으로 별도로 `BitsAndBytesConfig`를 새로 작성해 진행됨
-- 이 과정에서도 동일하게 `bnb_4bit_use_double_quant` 옵션이 검토되지 않고 누락됨 — 즉 Phase 1과 Phase 2에서 서로 무관하게 작성된 두 코드에서, 같은 종류의 검토 누락이 독립적으로 두 번 발생한 것
+- Double Quantization은 NF4 등 4-bit 양자화를 적용할 때 quantization constant(scale 값)까지 추가로 압축해 메모리를 더 아끼는 부가 옵션(`bnb_4bit_use_double_quant`)이며, 이 옵션의 기본값이 `False`라 명시하지 않으면 조용히 꺼진 채로 실행됨
+- 이 챌린지에서 NF4 4-bit 양자화가 적용된 지점은 두 곳(Phase 1의 QLoRA, Phase 2의 PTQ)이었고, 두 곳 모두 이 옵션이 누락됨
+  - Phase 1(1-3-1, QLoRA): 기반 모델을 4-bit로 로드하며 학습을 진행하는 과정에서 누락 — QLoRA 논문이 권장하는 표준 구성(NF4 + Double Quantization + bfloat16 compute dtype)을 검토하지 못함. 다만 QLoRA는 Phase 1에서 최종 선택되지 않았으므로(LoRA가 선택됨), 이 누락이 이후 단계에 직접 영향을 준 것은 아님
+  - Phase 2(2-3-2, PTQ): 병합된 LoRA 결과물(merged_lora_model)을 4-bit로 재로드하며 별도로 작성한 `BitsAndBytesConfig`에서 동일하게 누락 — Phase 1의 설정을 재사용한 것이 아니라, QLoRA와 무관하게 새로 작성된 코드에서 같은 옵션 검토가 독립적으로 빠진 것
+- 즉 최종 결과(최종 정리 표 1)의 memory 수치에 실제 영향을 준 것은 Phase 2(PTQ) 쪽 누락이며, Phase 1(QLoRA) 쪽 누락은 어차피 선택되지 않은 경로라 결과에 직접 반영되지 않음
 
 ### 결정 및 대응
 
