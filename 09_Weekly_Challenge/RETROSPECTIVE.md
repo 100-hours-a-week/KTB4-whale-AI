@@ -475,7 +475,7 @@ bnb_config = BitsAndBytesConfig(
 )
 ```
 
-- 이 설정이 Phase 2(2-3-2, PTQ)에서도 그대로 재사용되어, PTQ 단계 역시 Double Quantization 없이 진행됨
+- Phase 2(2-3-2, PTQ)에서도 별도로 작성된 `BitsAndBytesConfig`에 동일하게 `bnb_4bit_use_double_quant`가 지정되지 않아, PTQ 단계 역시 Double Quantization 없이 진행됨 (Phase 1의 설정을 재사용한 것이 아니라, 서로 무관하게 작성된 코드에서 같은 누락이 독립적으로 발생함)
 - 결과적으로 최종 정리 표 1에서 PTQ의 memory 절감폭이 이론적 최대치(1/4)에 못 미쳤던 원인(quantization constant 저장 오버헤드) 중 일부가 이 누락에서 비롯되었을 가능성이 확인됨
 
 ### 원인 분석
