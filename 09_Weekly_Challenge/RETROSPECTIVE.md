@@ -263,3 +263,190 @@ empty_device_cache()
 
 - 메모리 해제 코드는 "이번 Phase가 끝났다"는 시점 기준이 아니라, 전체 파이프라인에서 해당 객체가 이후 몇 단계까지 참조되는지를 먼저 확인하고 삭제 범위를 정해야 함
 - 트러블 슈팅 6(Adapter Merge 재배치)과 이 문제는 같은 원인(로드맵상 계획과 실제 의존관계의 불일치)에서 파생된 연쇄적 결과이며, 상위 결정(작업 순서 변경)이 하위 구현(메모리 관리 코드)에도 영향을 미친다는 것을 보여주는 사례임
+
+## 트러블 슈팅 8 - cmake 병렬 빌드 중 OOM(Out-Of-Memory) 발생
+
+### 문제 상황
+
+- llama.cpp를 CUDA 지원(`-DGGML_CUDA=ON`)으로 빌드하는 과정에서, 빌드가 43~45% 진행되던 중 다수의 `Killed` 메시지와 함께 컴파일 실패
+
+```
+gmake[3]: *** [.../conv2d-dw.cu.o] Error 137
+Killed
+```
+
+### 원인 분석
+
+- `cmake --build build --config Release -j`에서 `-j` 옵션에 값을 지정하지 않아, CPU 코어 수만큼 병렬 컴파일 작업이 동시에 실행됨
+- CUDA 컴파일러(`nvcc`)는 `.cu` 파일 하나를 컴파일하는 데도 순간적으로 많은 메모리를 요구하는데, 이를 코어 수만큼 동시에 돌리면서 12GB RAM을 순식간에 소진
+- Exit code 137(128+9, SIGKILL)은 Linux OOM Killer가 메모리 부족 상황에서 프로세스를 강제 종료했다는 신호였음
+
+### 결정 및 대응
+
+- `-j` 값을 명시적으로 낮춰 병렬 작업 수를 제한
+
+```python
+!cd llama.cpp && cmake --build build --config Release -j 2 --target llama-quantize llama-cli llama-perplexity
+```
+
+- 이미 컴파일된 오브젝트 파일은 캐시되어 재사용되므로, 처음부터 다시 빌드하지 않고 실패 지점부터 이어서 진행됨
+
+### 인사이트
+
+- `-j` 옵션에 값을 생략하면 "코어 수만큼 병렬 실행"이 기본값이 되는데, 이는 CPU 코어 수는 넉넉해도 RAM이 이를 못 받쳐주는 환경(특히 CUDA 컴파일처럼 단위당 메모리 요구가 큰 작업)에서는 오히려 독이 될 수 있음
+- 크래시 발생 시점 이후에 `free -h`를 찍어봐도, 이미 새 프로세스가 시작된 뒤라 크래시 당시 상태를 보여주지 못함 — 실시간 원인 파악에는 한계가 있었고, 결국 빌드 로그 자체(`Killed`, `Error 137`)가 가장 직접적인 단서였음
+
+---
+
+## 트러블 슈팅 9 - IPython 매직 명령어와 셸 명령어 혼용 오류
+
+### 문제 상황
+
+- bash 계열 명령어(`git`, `pip`, `cmake` 등)를 노트북 셀에서 실행하며 `!`와 `%`를 혼용하다 아래 에러 발생
+
+```
+UsageError: Line magic function %git not found.
+```
+
+### 원인 분석
+
+- `%`는 IPython이 자체 정의한 매직 명령어(`%cd`, `%pip`, `%time` 등) 전용 접두사이고, `git`처럼 일반 셸 프로그램은 매직 명령어로 존재하지 않음
+- `!`는 셸 명령어 실행 전용, `%`는 IPython 매직 전용이라는 역할이 구분되어 있었는데, 이를 명확히 인지하지 못한 채 전환하며 사용함
+- 다만 `pip`의 경우, `!pip`도 동작은 하지만 커널이 실제 사용 중인 Python 환경과 다른 환경에 설치될 수 있어 `%pip`가 권장되는 등, 명령어별로 권장 방식이 다름
+
+### 결정 및 대응
+
+- 순수 셸 명령어(`git`, `cmake`, `./build/bin/...`) → `!`
+- IPython 커널 환경에 영향을 주는 `pip`, `cd`(세션 전체에 걸쳐 유지되어야 하는 경우) → `%`
+- 멀티라인 백슬래시 연결이 필요한 경우 → `%%bash` 셀 매직으로 전환
+
+### 인사이트
+
+- `!`와 `%`는 비슷해 보이지만 실행 주체가 다름(하나는 셸 프로세스 위임, 하나는 IPython 자체 처리) — 이 차이를 알아두면 이후 유사한 명령어 실행 실패를 줄일 수 있음
+
+---
+
+## 트러블 슈팅 10 - TensorFlow/protobuf 임포트 충돌로 인한 0-2 재발 에러
+
+### 문제 상황
+
+- llama.cpp 빌드 관련 작업 이후, Phase 0(0-2)로 돌아와 Qwen 모델을 다시 로드하려는 시점에 아래 에러 발생
+
+```
+ImportError: cannot import name 'runtime_version' from 'google.protobuf'
+```
+
+- `transformers`가 Qwen2 모델 클래스를 import하는 과정에서 부수적으로 `tensorflow`까지 로드를 시도하다 발생한 에러였음
+
+### 원인 분석
+
+- 이번 챌린지는 PyTorch만 사용하고 TensorFlow는 전혀 필요하지 않았으나, `transformers`가 내부적으로 `is_tf_available()`이 True로 판정되면 TF 관련 모듈까지 자동으로 import하는 경로를 탐
+- `tensorflow`가 요구하는 `protobuf` 버전과 실제 설치된 `protobuf` 버전이 맞지 않아 충돌 발생
+- 환경변수(`os.environ["USE_TF"] = "0"`)로 우회를 시도했으나, 이미 `transformers`가 이전 실행에서 import된 상태(`sys.modules`에 캐시됨)라 환경변수가 반영되지 않고 동일 에러가 재발함 — Reload Window는 VSCode 창만 새로고침할 뿐 Jupyter 커널 프로세스 자체를 재시작하지 않아, 커널 상태가 그대로 유지된 것이 원인이었음
+
+### 결정 및 대응
+
+- 환경변수 우회 대신, 이번 챌린지에 불필요한 `tensorflow` 자체를 제거
+
+```python
+%pip uninstall -y tensorflow
+```
+
+- 제거 후 반드시 **커널 재시작**(Restart Kernel, Reload Window와는 다른 동작) 후 0-1부터 재실행
+
+### 인사이트
+
+- 환경변수를 통한 라이브러리 동작 제어는 해당 라이브러리가 **처음 import되는 시점보다 먼저** 설정되어야 효과가 있음 — 이미 import된 세션에서는 아무리 환경변수를 바꿔도 반영되지 않음
+- "Reload Window"와 "Restart Kernel"은 다른 동작이며, 커널 상태(이미 로드된 모듈)를 완전히 초기화하려면 반드시 Restart Kernel을 사용해야 함
+- 근본적으로 불필요한 의존성(이번 경우 tensorflow)은 우회하기보다 제거하는 편이 재발 가능성을 낮춤
+
+---
+
+## 트러블 슈팅 11 - transformers 버전 문제로 인한 GGUF 변환 실패
+
+### 문제 상황
+
+- `convert_hf_to_gguf.py`로 merged_lora_model을 변환하는 도중, 토크나이저 로드 단계에서 아래 에러 발생
+
+```
+AttributeError: 'list' object has no attribute 'keys'
+```
+
+### 원인 분석
+
+- `transformers`의 내부 메서드(`_set_model_specific_special_tokens`)가 `special_tokens`를 딕셔너리로 기대하고 `.keys()`를 호출했으나, 실제로는 리스트가 전달됨
+- Colab에 설치된 `transformers` 버전이 지나치게 최신이라, llama.cpp의 변환 스크립트가 아직 검증하지 못한 최신 API 변경과 어긋난 것으로 추정됨 — 앞서 겪은 torchao, bitsandbytes 문제와 동일한 유형(Colab 기본 이미지의 최신 버전과 특정 도구 간 호환성 불일치)
+
+### 결정 및 대응
+
+- 변환 작업에 한해 `transformers`를 검증된 안정 버전으로 다운그레이드
+
+```python
+%pip install "transformers==4.46.3" --break-system-packages
+```
+
+- fine-tuning 및 병합 결과물(merged_lora_model)은 이미 디스크에 저장되어 있었으므로, Phase 0~2를 재실행할 필요 없이 변환 단계만 독립적으로 재시도 가능했음
+
+### 인사이트
+
+- Colab 기본 환경처럼 라이브러리 버전이 계속 최신화되는 환경에서는, 특정 도구(llama.cpp 변환 스크립트 등)가 아직 대응하지 못한 최신 API 변경으로 인한 충돌이 반복적으로 발생할 수 있음
+- 학습 결과물을 디스크에 저장해두면(save_pretrained), 이후 단계에서 문제가 생겨도 전체 파이프라인을 처음부터 재실행하지 않고 문제 발생 지점부터만 복구할 수 있음 — 중간 산출물 저장의 중요성을 확인함
+
+---
+
+## 트러블 슈팅 12 - llama-cli 대화형 모드로 인한 셀 무한 대기
+
+### 문제 상황
+
+- `llama-cli`로 GGUF 모델 sanity check를 실행한 후, 응답이 정상적으로 출력되었음에도 셀이 5분 이상 계속 실행 중인 상태로 남음
+- 정지 버튼을 눌러도 즉시 반응하지 않고 지연 후에야 종료됨
+
+### 원인 분석
+
+- `llama-cli`는 `-p`(prompt)로 초기 프롬프트를 주면 한 번 응답한 뒤, 기본적으로 대화형(interactive) 모드로 전환되어 다음 사용자 입력을 계속 대기함
+- 노트북 셀 환경에서는 이 대화형 입력을 칠 방법이 없어, 응답이 이미 정상 완료되었음에도 셀이 끝나지 않고 대기 상태로 남은 것
+- Jupyter의 Interrupt(정지 버튼)가 곧바로 반응하지 않았던 것은, `llama-cli`가 C++로 컴파일된 외부 프로세스이고 stdin을 블로킹 방식으로 읽고 있어 신호 전달과 처리에 지연이 있었기 때문으로 추정됨
+
+### 결정 및 대응
+
+- `-no-cnv`(비대화형) 옵션을 추가해 한 번 응답 후 자동 종료되도록 수정
+- 이후 metrics 기록 및 반복 실행은 Python 바인딩(`llama_cpp.Llama`)으로만 진행 — CLI는 최초 1회 sanity check 용도로만 남기고, 자동화가 필요한 반복 작업에서는 배제함
+
+### 인사이트
+
+- CLI 도구는 원래 사람과의 대화형 상호작용을 위해 설계된 경우가 많아, 노트북처럼 자동화된 파이프라인에 그대로 사용하면 이번과 같은 대기 문제가 발생하기 쉬움 — 자동화 맥락에서는 처음부터 배치/비대화형 실행을 지원하는 옵션이나 별도 바인딩을 우선 고려하는 것이 안전함
+- 같은 llama.cpp 계열 실행 파일이라도 목적(대화형 CLI vs 배치성 계산 도구)이 다르면 동작 방식이 완전히 다를 수 있어, 이전 문제(대화형 모드 행업)의 해결책(예: timeout)을 다른 실행 파일에 검증 없이 그대로 적용하면 불필요한 코드가 남을 수 있음(트러블 슈팅 13 참고)
+
+---
+
+## 트러블 슈팅 13 - llama-perplexity 최소 토큰 요구량 미달
+
+### 문제 상황
+
+- `llama-perplexity`로 evaluation_text_list(20개 문장)의 perplexity를 측정하려는 시점에 아래 에러 발생
+
+```
+E perplexity: you need at least 1024 tokens to evaluate perplexity with a context of 512
+E perplexity: the data file you provided tokenizes to only 383 tokens
+```
+
+### 원인 분석
+
+- `llama-perplexity`는 텍스트를 슬라이딩 윈도우 방식으로 여러 청크로 나누어 평가하기 때문에, 최소한 context 크기(기본 512)의 2배 이상 토큰 수를 요구함
+- evaluation_text_list를 파일로 저장한 결과가 383토큰뿐이라 최소 요구치(1024)에 미달
+- 지금까지 사용해온 `measure_perplexity`(Hugging Face 기반, 문장별 개별 평가 후 평균)와 `llama-perplexity`(전체 텍스트를 연속 시퀀스로 슬라이딩 윈도우 평가)는 계산 방식 자체가 근본적으로 다르다는 점이 이 과정에서 드러남
+
+### 결정 및 대응
+
+- evaluation_text_list를 인위적으로 늘리는 대신, context 크기(`-c`)를 128로 낮춰 최소 요구 토큰 수를 데이터 크기에 맞춤
+
+```python
+!cd llama.cpp && ./build/bin/llama-perplexity -m ../qwen_daysync_q4_k_m.gguf -f ../evaluation_text.txt -c 128
+```
+
+- 이 방식으로 측정된 GGUF의 perplexity(5.5704)는 다른 Phase의 perplexity(baseline 13.66, LoRA 13.10, PTQ 22.44)와 **계산 방식이 달라 직접 비교 불가**하다는 점을 최종 정리 표 1에 각주로 명시
+
+### 인사이트
+
+- 동일한 이름(perplexity)의 지표라도, 측정 도구가 다르면 계산 방식(개별 문장 평균 vs 슬라이딩 윈도우 연속 평가)이 달라 절대값을 직접 비교할 수 없는 경우가 있음 — 지표 이름만 보고 동일 선상에서 비교하면 잘못된 결론(예: "GGUF가 압도적으로 우수하다")에 이를 수 있음
+- 도구가 요구하는 최소 조건(이번 경우 최소 토큰 수)을 데이터 크기에 맞추는 것과, 데이터를 도구의 요구治에 맞춰 늘리는 것 중 무엇이 더 타당한 선택인지는 상황에 따라 다르며, 이번에는 평가 데이터의 원본 의미를 훼손하지 않는 전자(context 축소)를 선택함
